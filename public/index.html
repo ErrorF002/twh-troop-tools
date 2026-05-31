@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Troop Tools</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <span class="brand-mark">⚜</span>
+      <h1>Troop Tools</h1>
+    </div>
+    <p class="tagline">Report generator for TroopWebHost</p>
+    <div id="session-bar" class="session-bar hidden">
+      <span id="session-info"></span>
+      <button id="logout-btn" type="button">Log Out</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ─── LOGIN VIEW ─────────────────────────────────────── -->
+  <section id="login-view" class="login-view hidden">
+    <div class="login-card">
+      <h2>Sign in to TroopWebHost</h2>
+      <p class="login-help">
+        Your credentials stay on this computer. They're held in memory only
+        while you're signed in, and never written to disk.
+      </p>
+      <form id="login-form" autocomplete="off">
+        <label class="field" id="subdomain-field">
+          <span class="field-label">TroopWebHost site path</span>
+          <span class="field-hint">
+            The part of your TroopWebHost URL after <code>troopwebhost.org/</code> —
+            e.g. <code>Troop123YourCity</code>
+          </span>
+          <input
+            type="text"
+            id="subdomain"
+            name="subdomain"
+            autocomplete="organization"
+            spellcheck="false"
+            required
+          />
+          <button type="button" id="change-subdomain" class="link-btn change-link hidden">Change</button>
+        </label>
+        <label class="field">
+          <span class="field-label">Username</span>
+          <input
+            type="text"
+            id="username"
+            name="twh-user-field"
+            autocomplete="off"
+            spellcheck="false"
+            required
+          />
+        </label>
+        <label class="field">
+          <span class="field-label">Password</span>
+          <input
+            type="password"
+            id="password"
+            name="twh-pass-field"
+            autocomplete="new-password"
+            required
+          />
+        </label>
+        <label class="checkbox-field">
+          <input type="checkbox" id="remember-me" />
+          <span class="checkbox-text">
+            <span class="checkbox-label">Remember username and password</span>
+            <span class="checkbox-warning">⚠ Your password will be stored unencrypted in this browser. Only check this on a computer you control and trust.</span>
+          </span>
+        </label>
+        <button type="submit" class="primary-btn" id="login-submit">
+          Sign In
+        </button>
+        <div id="login-result" class="result-area"></div>
+      </form>
+      <div class="login-fallback">
+        <p>
+          Don't want to log in? You can still
+          <button type="button" id="skip-login" class="link-btn">
+            generate reports by uploading CSVs manually
+          </button>.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── DASHBOARD VIEW ─────────────────────────────────── -->
+  <section id="dashboard-view" class="dashboard-view hidden">
+    <div id="reports-container">
+      <div class="loading">Loading reports…</div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Files are saved to your Downloads folder. CSVs and credentials are processed locally and never leave your computer.</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

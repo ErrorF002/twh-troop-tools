@@ -1,0 +1,20 @@
+{
+  "name": "troop-tools",
+  "version": "1.0.0",
+  "description": "Local web app for generating Scoutmaster reports from TroopWebHost CSV exports",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "postinstall": "node scripts/install-browser.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1",
+    "playwright": "^1.60.0",
+    "pptxgenjs": "^3.12.0",
+    "uuid": "^14.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
