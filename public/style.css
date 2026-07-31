@@ -61,10 +61,16 @@ header {
   font-style: italic;
 }
 
-.session-bar {
+.header-right {
   position: absolute;
   right: 2rem;
   top: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.session-bar {
   display: flex;
   align-items: center;
   gap: 0.85rem;
@@ -280,6 +286,18 @@ main {
   gap: 1.5rem;
   grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
   align-items: start;
+}
+
+.section-heading {
+  grid-column: 1 / -1;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--tan-dark);
+  border-bottom: 2px solid var(--tan);
+  padding-bottom: 0.35rem;
+  margin-top: 0.5rem;
 }
 
 .loading {
@@ -602,6 +620,233 @@ footer {
   border-top: 1px solid var(--border);
 }
 
+/* ─── Settings button ───────────────────────────────────── */
+.settings-btn {
+  background: transparent;
+  border: 1px solid var(--tan);
+  color: var(--tan-light);
+  padding: 0.35rem 0.85rem;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: background 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+.settings-btn:hover {
+  background: var(--tan);
+  color: var(--od-green-dark);
+}
+.settings-gear { font-size: 1rem; }
+
+/* ─── Modal ─────────────────────────────────────────────── */
+.modal { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; }
+.modal.hidden { display: none !important; }
+.modal-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(28, 35, 64, 0.5);
+  backdrop-filter: blur(2px);
+}
+.modal-dialog {
+  position: relative; z-index: 1;
+  background: var(--bg-card);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+  width: 100%;
+  max-width: 480px;
+  margin: 1rem;
+  overflow: hidden;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  background: var(--od-green-dark);
+  color: var(--text-light);
+  border-bottom: 3px solid var(--tan);
+}
+.modal-header h2 { flex: 1; font-size: 1rem; font-weight: 700; }
+.modal-close {
+  background: transparent;
+  border: none;
+  color: var(--tan-light);
+  font-size: 1.4rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 0.25rem;
+}
+.modal-close:hover { color: #fff; }
+.modal-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0.9rem 1.25rem;
+  background: #F7F4EC;
+  border-top: 1px solid var(--border);
+}
+.settings-section {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-mid);
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  margin-top: 0.25rem;
+}
+.settings-hint {
+  font-size: 0.82rem;
+  color: var(--text-mid);
+  line-height: 1.5;
+}
+.settings-hint code {
+  background: #F0EBDC;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.85em;
+}
+.btn-primary {
+  background: var(--od-green);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1.1rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-primary:hover { background: var(--od-green-light); }
+.btn-secondary {
+  background: transparent;
+  color: var(--text-mid);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 1.1rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.btn-secondary:hover { background: #F0EBDC; }
+#settings-result { font-size: 0.85rem; }
+#settings-result.success { color: var(--success); }
+#settings-result.error   { color: var(--error); }
+
+/* ─── TWH Connect Panel ─────────────────────────────────── */
+.twh-connect-area { position: relative; }
+
+.twh-connected {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.82rem;
+  color: var(--tan-light);
+}
+.twh-user-label { font-style: italic; }
+
+.twh-panel {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+  padding: 1.1rem 1.25rem;
+  min-width: 290px;
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.twh-panel-site {
+  font-size: 0.82rem;
+  color: var(--text-mid);
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+#twh-panel-result {
+  font-size: 0.82rem;
+  min-height: 1rem;
+}
+#twh-panel-result.error   { color: var(--error); }
+#twh-panel-result.working { color: var(--text-mid); font-style: italic; }
+
+/* ─── Setup Screen ───────────────────────────────────────── */
+.setup-view {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+.setup-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 2rem 2.25rem;
+  max-width: 520px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.setup-header {
+  text-align: center;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--tan);
+}
+.setup-mark {
+  font-size: 2.5rem;
+  color: var(--tan);
+  display: block;
+  margin-bottom: 0.5rem;
+}
+.setup-header h2 { font-size: 1.4rem; color: var(--od-green-dark); }
+.setup-header p  { font-size: 0.9rem; color: var(--text-mid); margin-top: 0.25rem; }
+.setup-section-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-mid);
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  margin-top: 0.25rem;
+}
+.setup-warning {
+  background: #FFF8E1;
+  border: 1px solid #F9A825;
+  border-left: 4px solid #F9A825;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  color: #5D4037;
+  line-height: 1.5;
+}
+.setup-ids-help {
+  background: #F0EBDC;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  font-size: 0.83rem;
+  color: var(--text-mid);
+  line-height: 1.55;
+}
+.setup-ids-help code {
+  background: #fff;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.85em;
+  border: 1px solid var(--border);
+}
+#setup-result {
+  font-size: 0.85rem;
+  min-height: 1rem;
+}
+#setup-result.error { color: var(--error); }
+
 /* ─── Responsive ────────────────────────────────────────── */
 @media (max-width: 700px) {
   #reports-container {
@@ -612,9 +857,10 @@ footer {
     padding-right: 1rem;
   }
   .brand h1 { font-size: 1.4rem; }
-  .session-bar {
+  .header-right {
     position: static;
     margin-top: 0.75rem;
     justify-content: flex-end;
+    flex-wrap: wrap;
   }
 }

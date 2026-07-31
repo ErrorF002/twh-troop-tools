@@ -14,80 +14,157 @@
       <h1>Troop Tools</h1>
     </div>
     <p class="tagline">Report generator for TroopWebHost</p>
-    <div id="session-bar" class="session-bar hidden">
-      <span id="session-info"></span>
-      <button id="logout-btn" type="button">Log Out</button>
+    <div class="header-right">
+
+      <!-- TWH connect area -->
+      <div id="twh-connect-area" class="twh-connect-area">
+
+        <!-- Disconnected state -->
+        <button id="twh-connect-btn" type="button" class="settings-btn">
+          <span>⚡</span> Connect to TroopWebHost
+        </button>
+
+        <!-- Connected state -->
+        <div id="twh-connected" class="twh-connected hidden">
+          <span id="twh-user-label" class="twh-user-label"></span>
+          <button id="twh-disconnect-btn" type="button" class="link-btn">Disconnect</button>
+        </div>
+
+        <!-- Login dropdown panel -->
+        <div id="twh-panel" class="twh-panel hidden">
+          <div class="twh-panel-site">
+            Connecting to: <strong id="twh-panel-subdomain"></strong>
+            <button type="button" id="twh-panel-change-site" class="link-btn" style="font-size:0.8rem;margin-left:0.4rem">change</button>
+          </div>
+          <label class="field">
+            <span class="field-label">Username</span>
+            <input type="text" id="twh-username" autocomplete="off" spellcheck="false" />
+          </label>
+          <label class="field">
+            <span class="field-label">Password</span>
+            <input type="password" id="twh-password" autocomplete="new-password" />
+          </label>
+          <label class="checkbox-field">
+            <input type="checkbox" id="twh-remember" />
+            <span class="checkbox-text">
+              <span class="checkbox-label">Remember credentials</span>
+              <span class="checkbox-warning">⚠ Stored unencrypted in this browser. Only use on a computer you control.</span>
+            </span>
+          </label>
+          <button type="button" id="twh-sign-in-btn" class="primary-btn" style="width:100%;margin-top:0.25rem">Sign In</button>
+          <div id="twh-panel-result"></div>
+        </div>
+      </div>
+
+      <button id="settings-btn" type="button" class="settings-btn">
+        <span class="settings-gear">⚙</span> Settings
+      </button>
     </div>
   </div>
 </header>
 
-<main>
-  <!-- ─── LOGIN VIEW ─────────────────────────────────────── -->
-  <section id="login-view" class="login-view hidden">
-    <div class="login-card">
-      <h2>Sign in to TroopWebHost</h2>
-      <p class="login-help">
-        Your credentials stay on this computer. They're held in memory only
-        while you're signed in, and never written to disk.
+<!-- ─── SETTINGS MODAL ──────────────────────────────────── -->
+<div id="settings-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+  <div class="modal-backdrop" id="settings-backdrop"></div>
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h2 id="settings-title">⚙ Settings</h2>
+      <button type="button" class="modal-close" id="settings-close" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body">
+
+      <label class="field">
+        <span class="field-label">Troop Name</span>
+        <span class="field-hint">Shown in report headers</span>
+        <input type="text" id="settings-troop-name" placeholder="e.g. Troop 233 Leon Springs" autocomplete="off" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">TroopWebHost Site Path</span>
+        <span class="field-hint">The part of your TWH URL after <code>troopwebhost.org/</code></span>
+        <input type="text" id="settings-subdomain" placeholder="e.g. Troop123YourCity" autocomplete="off" spellcheck="false" />
+      </label>
+
+      <div class="settings-section">TroopWebHost Menu Item IDs</div>
+      <p class="settings-hint">
+        Find these in your TWH report URLs after <code>Menu_Item_ID=</code>.
       </p>
-      <form id="login-form" autocomplete="off">
-        <label class="field" id="subdomain-field">
-          <span class="field-label">TroopWebHost site path</span>
-          <span class="field-hint">
-            The part of your TroopWebHost URL after <code>troopwebhost.org/</code> —
-            e.g. <code>Troop123YourCity</code>
-          </span>
-          <input
-            type="text"
-            id="subdomain"
-            name="subdomain"
-            autocomplete="organization"
-            spellcheck="false"
-            required
-          />
-          <button type="button" id="change-subdomain" class="link-btn change-link hidden">Change</button>
-        </label>
-        <label class="field">
-          <span class="field-label">Username</span>
-          <input
-            type="text"
-            id="username"
-            name="twh-user-field"
-            autocomplete="off"
-            spellcheck="false"
-            required
-          />
-        </label>
-        <label class="field">
-          <span class="field-label">Password</span>
-          <input
-            type="password"
-            id="password"
-            name="twh-pass-field"
-            autocomplete="new-password"
-            required
-          />
-        </label>
-        <label class="checkbox-field">
-          <input type="checkbox" id="remember-me" />
-          <span class="checkbox-text">
-            <span class="checkbox-label">Remember username and password</span>
-            <span class="checkbox-warning">⚠ Your password will be stored unencrypted in this browser. Only check this on a computer you control and trust.</span>
-          </span>
-        </label>
-        <button type="submit" class="primary-btn" id="login-submit">
-          Sign In
-        </button>
-        <div id="login-result" class="result-area"></div>
-      </form>
-      <div class="login-fallback">
-        <p>
-          Don't want to log in? You can still
-          <button type="button" id="skip-login" class="link-btn">
-            generate reports by uploading CSVs manually
-          </button>.
-        </p>
+
+      <label class="field">
+        <span class="field-label">Active Roster Report ID</span>
+        <input type="number" id="settings-id-roster" placeholder="e.g. 12345" min="1" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Rank Requirements Report ID</span>
+        <input type="number" id="settings-id-requirements" placeholder="e.g. 12345" min="1" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Merit Badge History Report ID</span>
+        <span class="field-hint">Reports → Merit Badge History By Scout By Badge Name</span>
+        <input type="number" id="settings-id-merit-badges" placeholder="e.g. 12345" min="1" />
+      </label>
+
+      <div id="settings-result"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" id="settings-cancel" class="btn-secondary">Cancel</button>
+      <button type="button" id="settings-save" class="btn-primary">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<main>
+  <!-- ─── SETUP VIEW (first run) ────────────────────────── -->
+  <section id="setup-view" class="setup-view hidden">
+    <div class="setup-card">
+      <div class="setup-header">
+        <span class="setup-mark">⚜</span>
+        <h2>Welcome to Troop Tools</h2>
+        <p>Let's get you set up. This only takes a minute.</p>
       </div>
+
+      <div class="setup-section-title">Your Troop</div>
+      <label class="field">
+        <span class="field-label">Troop Name *</span>
+        <span class="field-hint">Shown in report headers — e.g. "Troop 233 Leon Springs"</span>
+        <input type="text" id="setup-troop-name" placeholder="e.g. Troop 233 Leon Springs" autocomplete="off" />
+      </label>
+
+      <div class="setup-section-title">TroopWebHost Connection</div>
+      <div class="setup-warning">
+        <strong>Permission requirement:</strong> You need Scoutmaster-level access or Report permissions in TroopWebHost to use the auto-fetch features. If you are unsure of your access level, contact your Key 3 or Committee Chair before proceeding.
+      </div>
+
+      <label class="field">
+        <span class="field-label">TroopWebHost site path *</span>
+        <span class="field-hint">
+          The part of your TroopWebHost URL after <code>troopwebhost.org/</code> —
+          e.g. <code>Troop123YourCity</code>
+        </span>
+        <input type="text" id="setup-subdomain" placeholder="e.g. Troop123YourCity" autocomplete="off" spellcheck="false" />
+      </label>
+
+      <div class="setup-ids-help">
+        <strong>How to find your Report IDs:</strong>
+        Log in to TroopWebHost and run each report below manually. Look at the browser URL bar — copy the number that appears after <code>Menu_Item_ID=</code>.
+      </div>
+
+      <label class="field">
+        <span class="field-label">Active Roster Report ID *</span>
+        <span class="field-hint">Membership → Export Membership Data → Export Active Roster To Excel</span>
+        <input type="number" id="setup-id-roster" placeholder="e.g. 12345" min="1" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Rank Requirements Report ID *</span>
+        <span class="field-hint">Reports → Uncompleted Rank Requirements By Requirement</span>
+        <input type="number" id="setup-id-requirements" placeholder="e.g. 12345" min="1" />
+      </label>
+
+      <div id="setup-result"></div>
+      <button type="button" id="setup-submit" class="primary-btn">Get Started →</button>
     </div>
   </section>
 
@@ -100,7 +177,7 @@
 </main>
 
 <footer>
-  <p>Files are saved to your Downloads folder. CSVs and credentials are processed locally and never leave your computer.</p>
+  <p>Files are processed locally and never leave your computer. Credentials are held in memory only and never written to disk.</p>
 </footer>
 
 <script src="app.js"></script>
