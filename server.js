@@ -9,17 +9,38 @@
  * dialog just like any other file download.
  */
 
+// Must run before playwright loads
+if (process.pkg) {
+  const path = require("path");
+  const resourceDir = process.platform === "darwin"
+    ? path.join(path.dirname(process.execPath), "..", "Resources")
+    : path.dirname(process.execPath);
+  process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(resourceDir, "browsers");
+
+  // pkg's V8 snapshot breaks the lazy globalThis.crypto getter Node installs at
+  // bootstrap ("TypeError: Invalid host defined options") — playwright-core touches
+  // it as soon as it loads, so replace it with a plain reference before that happens.
+  Object.defineProperty(globalThis, "crypto", {
+    value: require("node:crypto").webcrypto,
+    configurable: true,
+    writable: true,
+  });
+}
+
 const express = require("express");
-const multer = require("multer");
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
+const multer  = require("multer");
+const fs      = require("fs");
+const path    = require("path");
+const os      = require("os");
+const net     = require("net");
+const { exec } = require("child_process");
 
 const twhSession = require("./twh/session");
 const { login: twhLogin } = require("./twh/login");
 const { downloadReport: twhDownload } = require("./twh/downloads");
+const settings   = require("./settings");
 
-const PORT = 3000;
+const PORT = 3000; // starting port — auto-increments if in use
 const app = express();
 
 // ═══════════════════════════════ AUTO-DISCOVERY ════════════════════════
@@ -51,7 +72,15 @@ const upload = multer({
 });
 
 // ═══════════════════════════════ MIDDLEWARE ════════════════════════════
-app.use(express.static(path.join(__dirname, "public")));
+const PUBLIC_DIR = process.pkg
+  ? path.join(
+      process.platform === "darwin"
+        ? path.join(path.dirname(process.execPath), "..", "Resources")
+        : path.dirname(process.execPath),
+      "public"
+    )
+  : path.join(__dirname, "public");
+app.use(express.static(PUBLIC_DIR));
 app.use(express.json());
 
 // ─── Serve generated HTML reports in new tab ─────────────────────────
@@ -71,6 +100,8 @@ app.get("/download/:filename", (req, res) => {
 
 // ═══════════════════════════════ SHARED SEND HELPER ═══════════════════
 async function generateAndStream(report, inputs, res, options = {}) {
+  // Inject troopName from settings so every report can use it
+  if (!options.troopName) options = { troopName: settings.load().troopName || "", ...options };
   const result = await report.generate(inputs, OUTPUT_DIR, options);
 
   // HTML output type: return JSON with URLs instead of streaming a file
@@ -111,6 +142,20 @@ async function generateAndStream(report, inputs, res, options = {}) {
     }
   });
 }
+
+// ═══════════════════════════════ SETTINGS ══════════════════════════════
+app.get("/api/settings", (req, res) => {
+  res.json(settings.load());
+});
+
+app.post("/api/settings", (req, res) => {
+  try {
+    const updated = settings.save(req.body || {});
+    res.json({ success: true, settings: updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ═══════════════════════════════ REPORT LISTING ════════════════════════
 app.get("/api/reports", (req, res) => {
@@ -318,10 +363,28 @@ process.on("SIGINT", async () => {
 });
 
 // ═══════════════════════════════ START ════════════════════════════════
-app.listen(PORT, () => {
-  console.log("");
-  console.log("════════════════════════════════════════════");
-  console.log(`  TROOP TOOLS — Running on port ${PORT}`);
-  console.log(`  Open in browser:  http://localhost:${PORT}`);
-  console.log("════════════════════════════════════════════");
+function findAvailablePort(start) {
+  return new Promise(resolve => {
+    const srv = net.createServer();
+    srv.listen(start, "127.0.0.1", () => { srv.close(() => resolve(start)); });
+    srv.on("error", () => resolve(findAvailablePort(start + 1)));
+  });
+}
+
+function openBrowser(url) {
+  const cmd = process.platform === "win32"  ? `start "" "${url}"` :
+              process.platform === "darwin" ? `open "${url}"` : `xdg-open "${url}"`;
+  exec(cmd, err => { if (err) console.warn("Could not auto-open browser:", err.message); });
+}
+
+findAvailablePort(PORT).then(port => {
+  app.listen(port, "127.0.0.1", () => {
+    const url = `http://localhost:${port}`;
+    console.log("");
+    console.log("════════════════════════════════════════════");
+    console.log(`  TROOP TOOLS — Running on port ${port}`);
+    console.log(`  Open in browser:  ${url}`);
+    console.log("════════════════════════════════════════════");
+    openBrowser(url);
+  });
 });

@@ -1,8 +1,10 @@
 node_modules/
 output/
+dist/
 *.csv
 *.pptx
 *.pdf
 *.vcf
 .DS_Store
 .claude/
+settings.json

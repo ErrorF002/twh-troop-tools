@@ -3,9 +3,25 @@
   "version": "1.0.0",
   "description": "Local web app for generating Scoutmaster reports from TroopWebHost CSV exports",
   "main": "server.js",
+  "bin": "server.js",
   "scripts": {
     "start": "node server.js",
-    "postinstall": "node scripts/install-browser.js"
+    "postinstall": "node scripts/install-browser.js",
+    "build": "node scripts/build.js",
+    "build:win": "node scripts/build.js --win",
+    "build:mac": "node scripts/build.js --mac"
+  },
+  "pkg": {
+    "scripts": [
+      "reports/**/*.js",
+      "node_modules/playwright-core/browsers.json"
+    ],
+    "targets": [
+      "node18-win-x64",
+      "node18-macos-x64",
+      "node18-macos-arm64"
+    ],
+    "outputPath": "dist/bin"
   },
   "dependencies": {
     "express": "^4.21.2",
@@ -13,6 +29,9 @@
     "playwright": "^1.60.0",
     "pptxgenjs": "^3.12.0",
     "uuid": "^14.0.0"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^5.16.1"
   },
   "engines": {
     "node": ">=18"
