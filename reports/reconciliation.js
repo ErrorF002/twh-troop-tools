@@ -218,22 +218,28 @@ function buildHTML(results, troopName, dateStr) {
       ${cells.map(c => `<td>${esc(c)}</td>`).join("")}
     </tr>`;
 
-  const section = (id, color, icon, title, badgeColor, rows, headers, rowFn) => {
+  const section = (id, color, icon, title, subtitle, badgeColor, rows, headers, rowFn) => {
     if (rows.length === 0) return `
       <div class="section" id="${id}">
         <div class="section-header" style="border-left-color:${color}">
-          <span class="section-icon">${icon}</span>
-          <span class="section-title">${title}</span>
-          ${badge(0, "#aaa")}
+          <div class="section-header-top">
+            <span class="section-icon">${icon}</span>
+            <span class="section-title">${title}</span>
+            ${badge(0, "#aaa")}
+          </div>
+          <p class="section-subtitle">${subtitle}</p>
         </div>
         <p class="empty-msg">No items in this category.</p>
       </div>`;
     return `
       <div class="section" id="${id}">
         <div class="section-header" style="border-left-color:${color}">
-          <span class="section-icon">${icon}</span>
-          <span class="section-title">${title}</span>
-          ${badge(rows.length, badgeColor)}
+          <div class="section-header-top">
+            <span class="section-icon">${icon}</span>
+            <span class="section-title">${title}</span>
+            ${badge(rows.length, badgeColor)}
+          </div>
+          <p class="section-subtitle">${subtitle}</p>
         </div>
         <table>
           <thead><tr>
@@ -248,6 +254,7 @@ function buildHTML(results, troopName, dateStr) {
   const msOnlySection = section(
     "ms-only", "#2E7D32", "➕",
     "Add to TroopWebHost",
+    "The following scouts are not in TroopWebHost but are listed in the Council Roster.",
     "#2E7D32", msOnly,
     ["BSA ID", "my.scouting Name", "Rank", "Registration Status"],
     r => checkRow([r.bsaId, r.myscoutingName, r.myscoutingRank, r.registrationStatus], "#2E7D32")
@@ -255,7 +262,8 @@ function buildHTML(results, troopName, dateStr) {
 
   const twhOnlySection = section(
     "twh-only", "#E65100", "🔎",
-    "Investigate in TroopWebHost",
+    "Missing in Council Roster",
+    "The following scouts are in TroopWebHost, but are not in the Council Roster.",
     "#E65100", twhOnly,
     ["BSA ID", "TroopWebHost Name", "Rank", "Patrol"],
     r => checkRow([r.bsaId, r.twhName, r.twhRank, r.patrol], "#E65100")
@@ -264,6 +272,7 @@ function buildHTML(results, troopName, dateStr) {
   const nameSection = section(
     "name-issues", "#003F87", "✏️",
     "Name Mismatches",
+    "The following scout's names do not match the name in the Council Roster.",
     "#003F87", nameIssues,
     ["BSA ID", "my.scouting Name", "TroopWebHost Name", "Patrol"],
     r => checkRow([r.bsaId, r.myscoutingName, r.twhName, r.patrol], "#003F87")
@@ -272,6 +281,7 @@ function buildHTML(results, troopName, dateStr) {
   const rankSection = section(
     "rank-issues", "#6A1B9A", "🎖️",
     "Rank Mismatches",
+    "The following scout's ranks do not match the rank in the Council Roster.",
     "#6A1B9A", rankIssues,
     ["BSA ID", "Name", "my.scouting Rank", "TroopWebHost Rank", "Patrol"],
     r => checkRow([r.bsaId, r.myscoutingName, r.myscoutingRank, r.twhRank, r.patrol], "#6A1B9A")
@@ -352,16 +362,24 @@ function buildHTML(results, troopName, dateStr) {
     box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
   .section-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
     padding: 1rem 1.25rem;
     background: #F7F4EC;
     border-bottom: 1px solid #D7CDB5;
     border-left: 5px solid #ccc;
   }
+  .section-header-top {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
   .section-icon { font-size: 1.2rem; }
   .section-title { font-weight: 700; font-size: 1rem; flex: 1; }
+  .section-subtitle {
+    margin-top: 0.35rem;
+    color: #4A5568;
+    font-size: 0.85rem;
+    font-style: italic;
+  }
   .badge {
     color: #fff;
     font-size: 0.82rem;
@@ -444,7 +462,7 @@ function buildHTML(results, troopName, dateStr) {
   </div>
   <div class="summary-item">
     <div class="summary-count" style="color:#E65100">${twhOnly.length}</div>
-    <div class="summary-label">Investigate in<br>TroopWebHost</div>
+    <div class="summary-label">Missing in<br>Council Roster</div>
   </div>
   <div class="summary-item">
     <div class="summary-count" style="color:#003F87">${nameIssues.length}</div>

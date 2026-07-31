@@ -582,7 +582,7 @@ function addPatrolSlide(pres, patrolName, patrolScouts, items, excludedNames) {
  * @param {string} outputDir - directory where the output file should be written
  * @returns {Object} { filePath, fileName, stats }
  */
-async function generate(inputs, outputDir) {
+async function generate(inputs, outputDir, options = {}) {
   const { requirements: reqPath, roster: rosterPath } = inputs;
   if (!reqPath || !fs.existsSync(reqPath)) throw new Error("Requirements CSV not provided");
   if (!rosterPath || !fs.existsSync(rosterPath)) throw new Error("Roster CSV not provided");
@@ -604,7 +604,8 @@ async function generate(inputs, outputDir) {
 
   const pres = new pptxgen();
   pres.layout = "LAYOUT_16x9";
-  pres.title = "Troop Advancement Report";
+  const troopName = options.troopName || "";
+  pres.title = troopName ? `${troopName} Advancement Report` : "Advancement Report";
 
   const dateStr = todayISO();
 

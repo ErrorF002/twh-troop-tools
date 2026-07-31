@@ -93,7 +93,8 @@ function esc(s) {
     .replace(/"/g, "&quot;");
 }
 
-function buildHTML(results, dateStr) {
+function buildHTML(results, dateStr, troopName) {
+  const label = troopName ? `${troopName} - ` : "";
   const { missingDob, noPatrol, missingId, duplicates, scoutCount } = results;
   const totalIssues = missingDob.length + noPatrol.length + missingId.length + duplicates.length;
 
@@ -129,7 +130,7 @@ function buildHTML(results, dateStr) {
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Roster Audit - ${dateStr}</title>
+<title>${esc(label)}Roster Audit - ${dateStr}</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -249,7 +250,7 @@ function buildHTML(results, dateStr) {
 <body>
 
 <div class="report-header">
-  <h1>⚜ Roster Audit</h1>
+  <h1>⚜ ${esc(label)}Roster Audit</h1>
   <div class="report-meta">Generated ${dateStr}  •  ${scoutCount} active youth  •  ${totalIssues} issue${totalIssues !== 1 ? "s" : ""} found</div>
 </div>
 
@@ -352,16 +353,17 @@ async function generate(inputs, outputDir, options = {}) {
   const { roster: rosterPath } = inputs;
   if (!rosterPath || !fs.existsSync(rosterPath)) throw new Error("TroopWebHost roster CSV not provided");
 
-  const scouts  = loadRoster(rosterPath);
-  const results = audit(scouts);
-  const dateStr = todayLong();
-  const ts = fileTimestamp();
+  const scouts    = loadRoster(rosterPath);
+  const results   = audit(scouts);
+  const dateStr   = todayLong();
+  const ts        = fileTimestamp();
+  const troopName = options.troopName || "";
 
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
   const htmlFileName = `Roster_Audit_${ts}.html`;
   const htmlPath     = path.join(outputDir, htmlFileName);
-  fs.writeFileSync(htmlPath, buildHTML(results, dateStr), "utf8");
+  fs.writeFileSync(htmlPath, buildHTML(results, dateStr, troopName), "utf8");
 
   const output = {
     htmlFileName,

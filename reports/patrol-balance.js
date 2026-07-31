@@ -20,6 +20,24 @@ const manifest = {
     },
   ],
   options: [
+    {
+      key: "patrolMin", label: "Min Patrol Size", type: "text",
+      placeholder: "8", default: "8",
+    },
+    {
+      key: "patrolMax", label: "Max Patrol Size", type: "text",
+      placeholder: "10", default: "10",
+    },
+    {
+      key: "ageWeight", label: "Age vs. Rank Weighting (Age / Rank)", type: "radio",
+      choices: [
+        { value: "0.5", label: "50 / 50" },
+        { value: "0.6", label: "60 / 40" },
+        { value: "0.7", label: "70 / 30" },
+        { value: "0.8", label: "80 / 20" },
+      ],
+      default: "0.7",
+    },
     { key: "downloadPdf", label: "Also download PDF", type: "checkbox", default: false },
     { key: "downloadCsv", label: "Also download CSV", type: "checkbox", default: false },
   ],
@@ -33,8 +51,8 @@ const RANK_VALUES = {
 };
 const AGE_WEIGHT        = 0.7;
 const RANK_WEIGHT       = 0.3;
-const TARGET_MIN        = 10;
-const TARGET_MAX        = 12;
+const TARGET_MIN        = 8;
+const TARGET_MAX        = 10;
 const HIGH_VAR_THRESHOLD = 1.0;
 
 // ═══════════════════════════════ MATH UTILITIES ══════════════════════════
@@ -55,18 +73,18 @@ function stdDev(arr) {
   return Math.sqrt(arr.reduce((s, v) => s + (v - m) ** 2, 0) / arr.length);
 }
 
-function score(scouts) {
-  return AGE_WEIGHT  * stdDev(scouts.map(s => s.age))
-       + RANK_WEIGHT * stdDev(scouts.map(s => s.rankNum));
+function score(scouts, aw, rw) {
+  return aw * stdDev(scouts.map(s => s.age))
+       + rw * stdDev(scouts.map(s => s.rankNum));
 }
 
-function metrics(scouts) {
+function metrics(scouts, aw, rw) {
   return {
     size:    scouts.length,
     avgAge:  mean(scouts.map(s => s.age)),
     sdAge:   stdDev(scouts.map(s => s.age)),
     sdRank:  stdDev(scouts.map(s => s.rankNum)),
-    score:   score(scouts),
+    score:   score(scouts, aw, rw),
   };
 }
 
@@ -108,7 +126,7 @@ function loadRoster(rosterPath) {
 }
 
 // ═══════════════════════════════ PATROL GROUPING ═════════════════════════
-function buildPatrols(scouts) {
+function buildPatrols(scouts, aw, rw) {
   const map = new Map();
   for (const s of scouts) {
     if (!map.has(s.patrol)) map.set(s.patrol, []);
@@ -122,7 +140,7 @@ function buildPatrols(scouts) {
     // New scout patrol: every member has No Rank
     const isNewScout  = members.every(s => s.rankNum === 0);
     const sorted      = members.slice().sort((a, b) => a.lastName.localeCompare(b.lastName));
-    patrols.push({ name, scouts: sorted, gender, isNewScout, metrics: metrics(sorted) });
+    patrols.push({ name, scouts: sorted, gender, isNewScout, metrics: metrics(sorted, aw, rw) });
   }
 
   patrols.sort((a, b) => {
@@ -135,15 +153,19 @@ function buildPatrols(scouts) {
 }
 
 // ═══════════════════════════════ SUGGESTIONS ════════════════════════════
-function findSuggestions(patrols) {
+function findSuggestions(patrols, cfg) {
+  const { aw, rw, patrolMin, patrolMax, highVarThreshold } = cfg;
+
+  const sc = scouts => score(scouts, aw, rw);
+  const mt = scouts => metrics(scouts, aw, rw);
+
   const suggestions = [];
-  const patrolByName = new Map(patrols.map(p => [p.name, p]));
 
   // --- Source-driven: too-large or high-variance patrols ---
   for (const src of patrols) {
     const issues = [];
-    if (src.metrics.size > TARGET_MAX)         issues.push("too-large");
-    if (src.metrics.score > HIGH_VAR_THRESHOLD) issues.push("high-variance");
+    if (src.metrics.size > patrolMax)         issues.push("too-large");
+    if (src.metrics.score > highVarThreshold) issues.push("high-variance");
     if (!issues.length) continue;
 
     let best = null;
@@ -151,19 +173,18 @@ function findSuggestions(patrols) {
 
     for (const scout of src.scouts) {
       const without = src.scouts.filter(s => s !== scout);
-      // Don't drop below minimum unless fixing an oversized patrol
-      if (!issues.includes("too-large") && without.length < TARGET_MIN) continue;
+      if (!issues.includes("too-large") && without.length < patrolMin) continue;
 
-      const srcImprovement = src.metrics.score - score(without);
+      const srcImprovement = src.metrics.score - sc(without);
 
       for (const dest of patrols) {
-        if (dest.name === src.name)               continue;
-        if (dest.gender    !== src.gender)         continue;
-        if (dest.isNewScout !== src.isNewScout)    continue;
-        if (dest.scouts.length >= TARGET_MAX)      continue;
+        if (dest.name === src.name)            continue;
+        if (dest.gender    !== src.gender)     continue;
+        if (dest.isNewScout !== src.isNewScout) continue;
+        if (dest.scouts.length >= patrolMax)   continue;
 
         const destWith = [...dest.scouts, scout];
-        const destHarm = score(destWith) - dest.metrics.score;
+        const destHarm = sc(destWith) - dest.metrics.score;
         const net      = srcImprovement - destHarm;
 
         if (net > bestNet) {
@@ -174,9 +195,9 @@ function findSuggestions(patrols) {
             from:        src.name,
             to:          dest.name,
             fromBefore:  src.metrics,
-            fromAfter:   metrics(without),
+            fromAfter:   mt(without),
             toBefore:    dest.metrics,
-            toAfter:     metrics(destWith),
+            toAfter:     mt(destWith),
           };
         }
       }
@@ -189,8 +210,8 @@ function findSuggestions(patrols) {
   const addressedDests = new Set(suggestions.map(s => s.to));
 
   for (const dest of patrols) {
-    if (dest.metrics.size >= TARGET_MIN)    continue;
-    if (addressedDests.has(dest.name))      continue;
+    if (dest.metrics.size >= patrolMin)   continue;
+    if (addressedDests.has(dest.name))    continue;
 
     let best = null;
     let bestDestScore = Infinity;
@@ -199,11 +220,11 @@ function findSuggestions(patrols) {
       if (src.name === dest.name)              continue;
       if (src.gender    !== dest.gender)       continue;
       if (src.isNewScout !== dest.isNewScout)  continue;
-      if (src.scouts.length <= TARGET_MIN)     continue; // must have scouts to spare
+      if (src.scouts.length <= patrolMin)      continue;
 
       for (const scout of src.scouts) {
-        const destWith    = [...dest.scouts, scout];
-        const destAfter   = score(destWith);
+        const destWith  = [...dest.scouts, scout];
+        const destAfter = sc(destWith);
         if (destAfter < bestDestScore) {
           bestDestScore = destAfter;
           const without = src.scouts.filter(s => s !== scout);
@@ -213,9 +234,9 @@ function findSuggestions(patrols) {
             from:       src.name,
             to:         dest.name,
             fromBefore: src.metrics,
-            fromAfter:  metrics(without),
+            fromAfter:  mt(without),
             toBefore:   dest.metrics,
-            toAfter:    metrics(destWith),
+            toAfter:    mt(destWith),
           };
         }
       }
@@ -240,60 +261,6 @@ function esc(s) {
 
 function fmt(n) { return isNaN(n) ? "-" : Number(n).toFixed(2); }
 
-function patrolStatusColor(p) {
-  if (p.metrics.size < TARGET_MIN || p.metrics.size > TARGET_MAX) return "#E65100";
-  if (p.metrics.score > HIGH_VAR_THRESHOLD) return "#E65100";
-  if (p.metrics.score > 0.75) return "#B8860B";
-  return "#2E7D32";
-}
-
-function patrolCard(p) {
-  const color = patrolStatusColor(p);
-  const rows  = p.scouts.map(s => `
-    <tr>
-      <td class="check-cell"><span class="cb"></span></td>
-      <td>${esc(s.fullName)}</td>
-      <td>${s.age || "-"}</td>
-      <td>${esc(s.rank || "No Rank")}</td>
-    </tr>`).join("");
-
-  const sizeFlag  = p.metrics.size < TARGET_MIN ? " (too small)" : p.metrics.size > TARGET_MAX ? " (too large)" : "";
-  const scoreFlag = p.metrics.score > HIGH_VAR_THRESHOLD ? " !" : "";
-
-  return `
-  <div class="patrol-card" style="border-left-color:${color}">
-    <div class="patrol-header">
-      <span class="patrol-name">${esc(p.name)}</span>
-      <span class="patrol-tag">${p.gender === "F" ? "Female" : "Male"}</span>
-      <span class="patrol-size" style="color:${color}">${p.metrics.size} scouts${esc(sizeFlag)}</span>
-    </div>
-    <table>
-      <thead><tr>
-        <th class="check-cell"></th>
-        <th>Scout</th><th>Age</th><th>Rank</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div class="patrol-metrics">
-      <div class="metric">
-        <span class="metric-label">Avg Age</span>
-        <span class="metric-value">${fmt(p.metrics.avgAge)}</span>
-      </div>
-      <div class="metric">
-        <span class="metric-label">Age SD</span>
-        <span class="metric-value">${fmt(p.metrics.sdAge)}</span>
-      </div>
-      <div class="metric">
-        <span class="metric-label">Rank SD</span>
-        <span class="metric-value">${fmt(p.metrics.sdRank)}</span>
-      </div>
-      <div class="metric">
-        <span class="metric-label">Score${esc(scoreFlag)}</span>
-        <span class="metric-value" style="color:${color}">${fmt(p.metrics.score)}</span>
-      </div>
-    </div>
-  </div>`;
-}
 
 function suggestionCard(s) {
   if (s.noMove) return `
@@ -342,7 +309,63 @@ function suggestionCard(s) {
   </div>`;
 }
 
-function buildHTML(patrols, suggestions, dateStr) {
+function buildHTML(patrols, suggestions, dateStr, troopName, cfg) {
+  const label = troopName ? `${troopName} - ` : "";
+  const { aw, rw, patrolMin, patrolMax, highVarThreshold } = cfg;
+
+  function patrolStatusColor(p) {
+    if (p.metrics.size < patrolMin || p.metrics.size > patrolMax) return "#E65100";
+    if (p.metrics.score > highVarThreshold) return "#E65100";
+    if (p.metrics.score > 0.75) return "#B8860B";
+    return "#2E7D32";
+  }
+
+  function patrolCard(p) {
+    const color     = patrolStatusColor(p);
+    const sizeFlag  = p.metrics.size < patrolMin ? " (too small)" : p.metrics.size > patrolMax ? " (too large)" : "";
+    const scoreFlag = p.metrics.score > highVarThreshold ? " !" : "";
+    const rows      = p.scouts.map(s => `
+      <tr>
+        <td class="check-cell"><span class="cb"></span></td>
+        <td>${esc(s.fullName)}</td>
+        <td>${s.age || "-"}</td>
+        <td>${esc(s.rank || "No Rank")}</td>
+      </tr>`).join("");
+    return `
+  <div class="patrol-card" style="border-left-color:${color}">
+    <div class="patrol-header">
+      <span class="patrol-name">${esc(p.name)}</span>
+      <span class="patrol-tag">${p.gender === "F" ? "Female" : "Male"}</span>
+      <span class="patrol-size" style="color:${color}">${p.metrics.size} scouts${esc(sizeFlag)}</span>
+    </div>
+    <table>
+      <thead><tr>
+        <th class="check-cell"></th>
+        <th>Scout</th><th>Age</th><th>Rank</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="patrol-metrics">
+      <div class="metric">
+        <span class="metric-label">Avg Age</span>
+        <span class="metric-value">${fmt(p.metrics.avgAge)}</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Age SD</span>
+        <span class="metric-value">${fmt(p.metrics.sdAge)}</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Rank SD</span>
+        <span class="metric-value">${fmt(p.metrics.sdRank)}</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Score${esc(scoreFlag)}</span>
+        <span class="metric-value" style="color:${color}">${fmt(p.metrics.score)}</span>
+      </div>
+    </div>
+  </div>`;
+  }
+
   const totalScouts    = patrols.reduce((s, p) => s + p.metrics.size, 0);
   const established    = patrols.filter(p => !p.isNewScout);
   const newScoutGroups = patrols.filter(p => p.isNewScout);
@@ -356,7 +379,7 @@ function buildHTML(patrols, suggestions, dateStr) {
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Patrol Balance - ${esc(dateStr)}</title>
+<title>${esc(label)}Patrol Balance - ${esc(dateStr)}</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -468,12 +491,11 @@ function buildHTML(patrols, suggestions, dateStr) {
 <body>
 
 <div class="report-header">
-  <h1>⚜ Patrol Balance</h1>
+  <h1>⚜ ${esc(label)}Patrol Balance</h1>
   <div class="report-meta">Generated ${esc(dateStr)}  •  ${totalScouts} active youth  •  ${patrols.length} patrols</div>
 </div>
 
 <h2>Step 1 - Established Patrols</h2>
-${established.map(p => `<div class="patrol-grid">${patrolCard(p)}</div>`).join("") /* one per row would be too narrow - use grid below */}
 <div class="patrol-grid">
   ${established.map(p => patrolCard(p)).join("")}
 </div>
@@ -488,9 +510,9 @@ ${newScoutGroups.length ? `
 <h2>Step 2 - Rebalancing Suggestions</h2>
 <p class="section-note">
   Each suggestion is a single-move analysis from current state.
-  Weighted score = ${Math.round(AGE_WEIGHT * 100)}% age SD + ${Math.round(RANK_WEIGHT * 100)}% rank SD.
-  Target size: ${TARGET_MIN}-${TARGET_MAX}.
-  High-variance threshold: ${HIGH_VAR_THRESHOLD}.
+  Weighted score = ${Math.round(aw * 100)}% age SD + ${Math.round(rw * 100)}% rank SD.
+  Target size: ${patrolMin}-${patrolMax}.
+  High-variance threshold: ${highVarThreshold}.
   Rank scale: No Rank=0, Scout=1, Tenderfoot=2, Second Class=3, First Class=4, Star=5, Life=6, Eagle=7.
 </p>
 ${step2Body}
@@ -558,17 +580,29 @@ async function generate(inputs, outputDir, options = {}) {
   const { roster: rosterPath } = inputs;
   if (!rosterPath || !fs.existsSync(rosterPath)) throw new Error("TroopWebHost roster CSV not provided");
 
+  const aw  = Math.min(Math.max(parseFloat(options.ageWeight) || AGE_WEIGHT, 0.1), 0.9);
+  const rw  = Math.round((1 - aw) * 10) / 10;
+  const cfg = {
+    aw,
+    rw,
+    patrolMin:        Math.max(parseInt(options.patrolMin) || TARGET_MIN, 1),
+    patrolMax:        Math.max(parseInt(options.patrolMax) || TARGET_MAX, 1),
+    highVarThreshold: HIGH_VAR_THRESHOLD,
+  };
+  if (cfg.patrolMin > cfg.patrolMax) cfg.patrolMax = cfg.patrolMin;
+
   const scouts      = loadRoster(rosterPath);
-  const patrols     = buildPatrols(scouts);
-  const suggestions = findSuggestions(patrols);
+  const patrols     = buildPatrols(scouts, cfg.aw, cfg.rw);
+  const suggestions = findSuggestions(patrols, cfg);
   const dateStr     = todayLong();
   const ts          = fileTimestamp();
+  const troopName   = options.troopName || "";
 
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
   const htmlFileName = `Patrol_Balance_${ts}.html`;
   const htmlPath     = path.join(outputDir, htmlFileName);
-  fs.writeFileSync(htmlPath, buildHTML(patrols, suggestions, dateStr), "utf8");
+  fs.writeFileSync(htmlPath, buildHTML(patrols, suggestions, dateStr, troopName, cfg), "utf8");
 
   const output = {
     htmlFileName,

@@ -801,9 +801,13 @@ function slideStalledScoutsDetail(pres, scouts, dateStr) {
 }
 
 // ═══════════════════════════════ MAIN ENTRY POINT ══════════════════════
-async function generate(inputs, outputDir) {
+async function generate(inputs, outputDir, options = {}) {
   const { roster: rosterPath } = inputs;
   if (!rosterPath || !fs.existsSync(rosterPath)) throw new Error("Roster CSV not provided");
+
+  // Apply troopName from settings/options for this run only
+  const savedTroopName = CONFIG.troopName;
+  CONFIG.troopName = (options.troopName || "BSA Troop").toUpperCase();
 
   const scouts = loadScouts(rosterPath);
   const adultCount = countAdults(rosterPath);
@@ -831,6 +835,8 @@ async function generate(inputs, outputDir) {
   const fileName = `troop_health_${dateStr}.pptx`;
   const filePath = path.join(outputDir, fileName);
   await pres.writeFile({ fileName: filePath });
+
+  CONFIG.troopName = savedTroopName;
 
   return {
     filePath,
