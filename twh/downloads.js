@@ -13,9 +13,10 @@
  * your troop's TroopWebHost account before use.
  */
 
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
+const fs       = require("fs");
+const path     = require("path");
+const os       = require("os");
+const settings = require("../settings");
 
 const TROOPWEBHOST_REPORT_BASE = "https://www.troopwebhost.org/FormReport.aspx";
 const DOWNLOAD_TIMEOUT_MS = 60000;
@@ -34,6 +35,11 @@ const RECIPES = {
     id: "requirements",
     description: "Uncompleted Rank Requirements By Requirement CSV",
     menuItemId: 46047,
+  },
+  meritBadges: {
+    id: "meritBadges",
+    description: "Merit Badge History By Scout CSV",
+    menuItemId: 52388,
   },
 };
 
@@ -55,7 +61,15 @@ async function downloadReport(page, reportName) {
   const recipe = RECIPES[reportName];
   if (!recipe) throw new Error(`Unknown TroopWebHost report: ${reportName}`);
 
-  const url = reportUrl(recipe.menuItemId);
+  const configuredIds = settings.load().menuItemIds;
+  const menuItemId    = configuredIds && configuredIds[reportName];
+  if (!menuItemId) {
+    throw new Error(
+      `The Menu Item ID for "${recipe.description}" is not configured. ` +
+      `Open Settings, enter the ID from your TroopWebHost report URL (after Menu_Item_ID=), and save.`
+    );
+  }
+  const url = reportUrl(menuItemId);
   console.log(`  → Navigating to report URL: ${url}`);
 
   try {
