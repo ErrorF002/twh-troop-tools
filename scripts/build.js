@@ -32,7 +32,8 @@ const platform = ARGS.includes("--mac") ? "mac"
   : ARGS.includes("--win")              ? "win"
   : process.platform === "darwin"       ? "mac" : "win";
 
-const OUT = path.join(ROOT, "dist", platform);
+const OUT       = path.join(ROOT, "dist", platform);
+const ICONS_DIR = path.join(ROOT, "assets");
 
 console.log(`\n${"=".repeat(60)}`);
 console.log(`  Building Troop Tools v${VERSION} — target: ${platform}`);
@@ -125,6 +126,11 @@ function buildMac() {
   // Info.plist
   fs.writeFileSync(path.join(appDir, "Contents", "Info.plist"), makePlist(), "utf8");
 
+  // App icon
+  const resourcesDir = path.join(appDir, "Contents", "Resources");
+  fs.mkdirSync(resourcesDir, { recursive: true });
+  fs.copyFileSync(path.join(ICONS_DIR, "icon.icns"), path.join(resourcesDir, "icon.icns"));
+
   // DMG
   const dmgPath = path.join(OUT, `TroopTools-v${VERSION}.dmg`);
   step("Creating DMG...");
@@ -155,6 +161,7 @@ SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=lowest
 UninstallDisplayName=Troop Tools
+SetupIconFile=${path.join(ICONS_DIR, "icon.ico")}
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -189,6 +196,7 @@ function makePlist() {
   <key>CFBundleIdentifier</key><string>com.bsa.troop-tools</string>
   <key>CFBundleName</key><string>Troop Tools</string>
   <key>CFBundleDisplayName</key><string>Troop Tools</string>
+  <key>CFBundleIconFile</key><string>icon.icns</string>
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
   <key>CFBundleVersion</key><string>${VERSION}</string>
   <key>CFBundlePackageType</key><string>APPL</string>

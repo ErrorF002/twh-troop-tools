@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4A6339"/>
+      <stop offset="100%" stop-color="#2A3A1F"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1024" height="1024" rx="220" fill="url(#bg)"/>
+
+  <circle cx="512" cy="470" r="300" fill="none" stroke="#C7A975" stroke-width="22"/>
+
+  <text x="512" y="580" text-anchor="middle"
+        font-family="Georgia, 'Times New Roman', serif" font-weight="700"
+        font-size="360" fill="#FAF7F0">TT</text>
+
+  <rect x="212" y="840" width="600" height="40" rx="20" fill="#C7A975"/>
+</svg>
