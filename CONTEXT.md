@@ -62,9 +62,10 @@ TWH is an ASP.NET site with unusual structure. Key facts:
 - **Menu:** Behind a hamburger button (`href="javascript:togglemenu();"`). Categories use `toggleLower('mNN')` to expand — they don't navigate.
 - **Downloads:** Reports are downloaded by navigating directly to URLs of the form `https://www.troopwebhost.org/FormReport.aspx?Menu_Item_ID=XXXXX&Stack=1&ReportFormat=XLS`. These URLs are troop-specific (Menu_Item_IDs may vary by troop).
 
-**Example Menu_Item_IDs (these are unit-specific — update for your troop):**
-- Roster: `53747`
-- Uncompleted Rank Requirements By Requirement: `46047`
+Menu_Item_IDs are unit-specific. They're no longer hardcoded in the
+codebase; each troop configures its own via the Settings UI (see
+`settings.js`), which stores them as `menuItemIds.roster`,
+`menuItemIds.requirements`, and `menuItemIds.meritBadges`.
 
 **Download trigger:** `page.goto(url)` throws "Download is starting" — this is expected and must be caught silently. The download event listener must be set up before the navigation.
 
@@ -134,7 +135,7 @@ The server auto-discovers all `.js` files in `reports/`. Adding a new report = d
 ### my.scouting Roster CSV
 
 - Has a 10-line header block before the actual data (district, council, org name, etc.)
-- Troop name can be extracted from line matching `Organization Name: Troop 0233...`
+- Troop name can be extracted from line matching `Organization Name: Troop 0123...`
 - Field `..memberid` has leading dots due to the comment marker format
 - `firstname` field contains legal first name + middle name combined (e.g. "Jiann Molly") — strip after first word for name comparison
 - Youth are `positionname === "Youth Member"`, adults have various role names

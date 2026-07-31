@@ -9,8 +9,8 @@
  * A blank page (rather than a redirect to login) is returned when not logged
  * in, so we verify the download actually fires rather than trusting the response.
  *
- * NOTE: Menu_Item_IDs are troop-specific. Update the IDs below to match
- * your troop's TroopWebHost account before use.
+ * NOTE: Menu_Item_IDs are troop-specific. Each troop configures its own
+ * via the Settings UI (see settings.js) rather than hardcoding them here.
  */
 
 const fs       = require("fs");
@@ -22,24 +22,21 @@ const TROOPWEBHOST_REPORT_BASE = "https://www.troopwebhost.org/FormReport.aspx";
 const DOWNLOAD_TIMEOUT_MS = 60000;
 
 // ═══════════════════════════════ RECIPES ════════════════════════════════
-// Each recipe maps to a direct TroopWebHost report URL.
-// Menu_Item_ID values are troop-specific — update these for your unit.
+// Each recipe maps to a direct TroopWebHost report URL. The Menu_Item_ID
+// itself is troop-specific and comes from settings.js, not from here.
 
 const RECIPES = {
   roster: {
     id: "roster",
     description: "Active Roster CSV",
-    menuItemId: 53747,
   },
   requirements: {
     id: "requirements",
     description: "Uncompleted Rank Requirements By Requirement CSV",
-    menuItemId: 46047,
   },
   meritBadges: {
     id: "meritBadges",
     description: "Merit Badge History By Scout CSV",
-    menuItemId: 52388,
   },
 };
 

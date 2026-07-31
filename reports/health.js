@@ -31,7 +31,7 @@ const manifest = {
 
 // ═══════════════════════════════ CONFIG ════════════════════════════════
 const CONFIG = {
-  troopName: "TROOP 233",
+  troopName: "BSA TROOP",
   recentLowerRankDays: 90,
   recentUpperRankDays: 180,
 };
