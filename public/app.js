@@ -99,6 +99,7 @@
     if (prefill.subdomain)   $("#setup-subdomain").value        = prefill.subdomain;
     if (prefill.menuItemIds?.roster)       $("#setup-id-roster").value        = prefill.menuItemIds.roster;
     if (prefill.menuItemIds?.requirements) $("#setup-id-requirements").value  = prefill.menuItemIds.requirements;
+    if (prefill.menuItemIds?.meritBadges)  $("#setup-id-merit-badges").value  = prefill.menuItemIds.meritBadges;
   }
 
   $("#setup-submit").addEventListener("click", async () => {
@@ -106,6 +107,7 @@
     const subdomain   = $("#setup-subdomain").value.trim();
     const rosterRaw   = $("#setup-id-roster").value.trim();
     const reqRaw      = $("#setup-id-requirements").value.trim();
+    const meritRaw    = $("#setup-id-merit-badges").value.trim();
     const resultEl    = $("#setup-result");
 
     if (!troopName)   { resultEl.textContent = "Troop Name is required."; resultEl.className = "error"; return; }
@@ -115,8 +117,10 @@
 
     const roster       = parseInt(rosterRaw, 10);
     const requirements = parseInt(reqRaw, 10);
+    const meritBadges  = meritRaw ? parseInt(meritRaw, 10) : null;
     if (isNaN(roster) || roster < 1)       { resultEl.textContent = "Roster Report ID must be a positive number."; resultEl.className = "error"; return; }
     if (isNaN(requirements) || requirements < 1) { resultEl.textContent = "Requirements Report ID must be a positive number."; resultEl.className = "error"; return; }
+    if (meritRaw && (isNaN(meritBadges) || meritBadges < 1)) { resultEl.textContent = "Merit Badge History Report ID must be a positive number."; resultEl.className = "error"; return; }
 
     $("#setup-submit").disabled = true;
     resultEl.textContent = "";
@@ -126,7 +130,7 @@
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           setupComplete: true, troopName, subdomain,
-          menuItemIds: { roster, requirements },
+          menuItemIds: { roster, requirements, meritBadges },
         }),
       });
       const data = await res.json();

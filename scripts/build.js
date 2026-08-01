@@ -151,7 +151,7 @@ function makeISS() {
 [Setup]
 AppName=Troop Tools
 AppVersion=${VERSION}
-AppPublisher=BSA Troop Tools
+AppPublisher=TWH Troop Tools
 DefaultDirName={autopf}\\TroopTools
 DefaultGroupName=Troop Tools
 OutputDir=${appDir}
@@ -193,7 +193,7 @@ function makePlist() {
 <plist version="1.0">
 <dict>
   <key>CFBundleExecutable</key><string>troop-tools</string>
-  <key>CFBundleIdentifier</key><string>com.bsa.troop-tools</string>
+  <key>CFBundleIdentifier</key><string>com.twh-troop-tools.app</string>
   <key>CFBundleName</key><string>Troop Tools</string>
   <key>CFBundleDisplayName</key><string>Troop Tools</string>
   <key>CFBundleIconFile</key><string>icon.icns</string>
