@@ -14,7 +14,7 @@ const manifest = {
     {
       key: "roster",
       label: "TroopWebHost Active Roster CSV",
-      hint: "Export: Membership → Export Membership Data → Export Active Roster To Excel",
+      hint: "Export: Menu → Membership → Export Membership Data → Export Active Roster to Excel",
       required: true,
       twhReport: "roster",
     },

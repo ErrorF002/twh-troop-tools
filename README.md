@@ -36,14 +36,14 @@ You can revisit these anytime from the **Settings** button on the dashboard.
 TroopWebHost doesn't have a lookup API for this, so it's a one-time manual step per report:
 
 1. Log into TroopWebHost in your regular browser.
-2. Run the report once the normal way (e.g. Reports → Uncompleted Rank Requirements By Requirement, or Membership → Export Roster).
+2. Run the report once the normal way (see the exact menu paths below).
 3. Look at the URL in your browser - it will contain `Menu_Item_ID=12345`.
 4. Copy that number into the matching field in Troop Tools' Settings.
 
 Reports Troop Tools can auto-fetch this way:
-- **Roster** - Membership → Export Membership Data → Export Roster to Excel
-- **Requirements** - Reports → Uncompleted Rank Requirements By Requirement
-- **Merit Badge History** - Reports → Merit Badge History By Scout By Badge Name
+- **Roster** - Menu → Membership → Export Membership Data → Export Active Roster to Excel
+- **Requirements** - Menu → Advancement → Requirements Reports → Uncompleted Rank Requirements By Requirement → Open in Excel
+- **Merit Badge History** - Menu → Advancement → Advancement Status Reports → Merit Badge History By Scout By Badge Name → Open in Excel
 
 Any report can also be run without these, using the manual upload path below.
 

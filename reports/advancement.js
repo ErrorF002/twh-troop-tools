@@ -25,14 +25,14 @@ const manifest = {
     {
       key: "requirements",
       label: "Uncompleted Requirements CSV",
-      hint: "Export: Reports → Uncompleted Rank Requirements by Requirement",
+      hint: "Export: Menu → Advancement → Requirements Reports → Uncompleted Rank Requirements By Requirement → Open in Excel",
       required: true,
       twhReport: "requirements",
     },
     {
       key: "roster",
       label: "Active Roster CSV",
-      hint: "Export: Membership → Export Membership Data → Export Active Roster To Excel",
+      hint: "Export: Menu → Membership → Export Membership Data → Export Active Roster to Excel",
       required: true,
       twhReport: "roster",
     },

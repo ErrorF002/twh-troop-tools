@@ -14,7 +14,7 @@ const manifest = {
     {
       key:       "meritBadges",
       label:     "Merit Badge History CSV",
-      hint:      "Export: Reports → Merit Badge History By Scout By Badge Name",
+      hint:      "Export: Menu → Advancement → Advancement Status Reports → Merit Badge History By Scout By Badge Name → Open in Excel",
       required:  true,
       twhReport: "meritBadges",
     },
