@@ -33,6 +33,7 @@ const fs      = require("fs");
 const path    = require("path");
 const os      = require("os");
 const net     = require("net");
+const readline = require("readline");
 const { exec } = require("child_process");
 
 const twhSession = require("./twh/session");
@@ -356,10 +357,24 @@ app.post("/api/reports/:id/generate", (req, res) => {
 });
 
 // ═══════════════════════════════ GRACEFUL SHUTDOWN ═════════════════════
-process.on("SIGINT", async () => {
+let shuttingDown = false;
+async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
   console.log("\n⏹  Shutting down...");
   try { await twhSession.close(); } catch {}
   process.exit(0);
+}
+
+process.on("SIGINT", shutdown);
+
+// The packaged app's console window has no buttons - closing it with the X
+// skips Node's cleanup entirely, so give users an explicit, graceful way to
+// stop the server and close the background browser session.
+const rl = readline.createInterface({ input: process.stdin });
+rl.on("line", line => {
+  const cmd = line.trim().toLowerCase();
+  if (cmd === "q" || cmd === "quit" || cmd === "exit") shutdown();
 });
 
 // ═══════════════════════════════ START ════════════════════════════════
@@ -382,8 +397,11 @@ findAvailablePort(PORT).then(port => {
     const url = `http://localhost:${port}`;
     console.log("");
     console.log("════════════════════════════════════════════");
-    console.log(`  TROOP TOOLS — Running on port ${port}`);
+    console.log(`  TROOP TOOLS - Running on port ${port}`);
     console.log(`  Open in browser:  ${url}`);
+    console.log("");
+    console.log("  Type Q and press Enter to stop Troop Tools");
+    console.log("  (or press Ctrl+C)");
     console.log("════════════════════════════════════════════");
     openBrowser(url);
   });
