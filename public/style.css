@@ -53,6 +53,14 @@ header {
 .brand { display: flex; align-items: center; gap: 0.75rem; }
 .brand-mark { font-size: 2rem; color: var(--tan); line-height: 1; }
 .brand h1 { font-size: 1.75rem; font-weight: 800; letter-spacing: 0.5px; }
+.app-version {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--tan-light);
+  opacity: 0.8;
+  align-self: flex-end;
+  margin-bottom: 0.3rem;
+}
 
 .tagline {
   margin-top: 0.4rem;

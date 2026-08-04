@@ -40,6 +40,7 @@ const twhSession = require("./twh/session");
 const { login: twhLogin } = require("./twh/login");
 const { downloadReport: twhDownload } = require("./twh/downloads");
 const settings   = require("./settings");
+const { version: APP_VERSION } = require("./package.json");
 
 const PORT = 3000; // starting port — auto-increments if in use
 const app = express();
@@ -143,6 +144,11 @@ async function generateAndStream(report, inputs, res, options = {}) {
     }
   });
 }
+
+// ═══════════════════════════════ VERSION ════════════════════════════════
+app.get("/api/version", (req, res) => {
+  res.json({ version: APP_VERSION });
+});
 
 // ═══════════════════════════════ SETTINGS ══════════════════════════════
 app.get("/api/settings", (req, res) => {

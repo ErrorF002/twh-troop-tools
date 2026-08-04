@@ -698,6 +698,11 @@
   }
 
   // ─── Initialise ───────────────────────────────────────
+  fetch("/api/version")
+    .then(r => r.json())
+    .then(data => { if (data.version) $("#app-version").textContent = `v${data.version}`; })
+    .catch(() => {});
+
   let appSettings;
   try {
     const res = await fetch("/api/settings");
