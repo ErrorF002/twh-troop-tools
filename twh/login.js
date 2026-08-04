@@ -138,10 +138,12 @@ async function login(page, subdomain, username, password) {
   // may submit via Ajax, full postback, or popup-close. Just wait until
   // we see logged-in markers.
   await submitButton.click();
-  await page.waitForTimeout(1500);
 
-  // Verify success
-  const success = await detectLoggedIn(page);
+  // Poll for logged-in markers rather than a single check after a fixed
+  // delay - some troops' sites take noticeably longer than others to
+  // reload the post-login frame, and a one-shot check too early produces
+  // a false "login failed" even though login actually succeeded.
+  const success = await waitForLoggedIn(page, 10000);
   if (!success) {
     const errorMsg = await extractLoginError(page);
     if (errorMsg) {
@@ -259,6 +261,18 @@ async function findFirstAnywhere(page, selectors) {
 }
 
 // ═══════════════════════════════ POST-LOGIN VERIFICATION ════════════════
+
+/**
+ * Poll until detectLoggedIn(page) returns true, or the timeout elapses.
+ */
+async function waitForLoggedIn(page, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await detectLoggedIn(page)) return true;
+    await page.waitForTimeout(400);
+  }
+  return detectLoggedIn(page);
+}
 
 async function detectLoggedIn(page) {
   for (const frame of page.frames()) {
