@@ -19,7 +19,10 @@ const os       = require("os");
 const settings = require("../settings");
 
 const TROOPWEBHOST_REPORT_BASE = "https://www.troopwebhost.org/FormReport.aspx";
-const DOWNLOAD_TIMEOUT_MS = 60000;
+// Some reports (e.g. Merit Badge History, which covers the troop's entire
+// badge history) can take TroopWebHost noticeably longer to generate than a
+// simple roster export - give it generous headroom before giving up.
+const DOWNLOAD_TIMEOUT_MS = 120000;
 
 // ═══════════════════════════════ RECIPES ════════════════════════════════
 // Each recipe maps to a direct TroopWebHost report URL. The Menu_Item_ID
@@ -116,7 +119,13 @@ async function downloadReport(page, reportName) {
   } catch (err) {
     // Capture diagnostics on failure
     const diagPath = await captureDiagnostics(page, `download-failed-${recipe.id}`);
-    throw new Error(`Failed to download ${recipe.description}: ${err.message}  Diagnostic info: ${diagPath}`);
+    const isTimeout = /timeout/i.test(err.message) && /exceeded/i.test(err.message);
+    const summary = isTimeout
+      ? `TroopWebHost didn't finish generating "${recipe.description}" within ` +
+        `${DOWNLOAD_TIMEOUT_MS / 1000} seconds and no file ever started downloading. This can ` +
+        "happen with large reports or when TroopWebHost is slow to respond - try again in a moment."
+      : `Failed to download ${recipe.description}: ${err.message}`;
+    throw new Error(`${summary}  Diagnostic info: ${diagPath}`);
   }
 }
 
