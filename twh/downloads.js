@@ -69,13 +69,38 @@ async function downloadReport(page, reportName) {
   const url = reportUrl(menuItemId);
   console.log(`  → Navigating to report URL: ${url}`);
 
+  // Set up the download listener first, then navigate.
+  const downloadPromise = page.waitForEvent("download", { timeout: DOWNLOAD_TIMEOUT_MS });
+
+  // page.goto() rejects when the response is a file download - the browser
+  // interrupts navigation to start the download instead of loading a page.
+  // This is expected and we ignore it. But if goto() *resolves* instead,
+  // TroopWebHost served a normal page, not a file - almost always because
+  // the signed-in account doesn't have permission to run this report, so
+  // TWH silently redirects back to Home rather than showing an error. Catch
+  // that immediately instead of waiting out the full download timeout for
+  // an event that was never going to fire.
+  let loadedNormalPage = false;
   try {
-    // Set up the download listener first, then navigate.
-    // page.goto will throw "Download is starting" when the server responds
-    // with a file instead of a page — this is expected and we ignore it.
-    const downloadPromise = page.waitForEvent("download", { timeout: DOWNLOAD_TIMEOUT_MS });
-    page.goto(url, { waitUntil: "commit", timeout: DOWNLOAD_TIMEOUT_MS })
-      .catch(() => { /* expected: throws when response is a file download */ });
+    await page.goto(url, { waitUntil: "commit", timeout: DOWNLOAD_TIMEOUT_MS });
+    loadedNormalPage = true;
+  } catch {
+    // expected when the response is a file
+  }
+
+  if (loadedNormalPage) {
+    const diagPath = await captureDiagnostics(page, `no-permission-${recipe.id}`);
+    throw new Error(
+      `TroopWebHost loaded a normal page instead of returning "${recipe.description}". ` +
+      "This almost always means the signed-in account doesn't have permission to run this " +
+      "report - ask your Key 3 or Committee Chair to grant Scoutmaster-level access or " +
+      "Report permissions. (If this happens after being idle a long time, try reconnecting " +
+      "via the Connect button instead.) " +
+      `Diagnostic info: ${diagPath}`
+    );
+  }
+
+  try {
     const download = await downloadPromise;
 
     const tempDir = path.join(os.tmpdir(), "troop-tools-twh");
