@@ -14,7 +14,7 @@ Two ways it runs:
 
 The user opens it in a browser, either signs into TroopWebHost (the app drives a hidden Playwright browser to fetch CSVs automatically) or uploads CSVs manually, and generates reports with one click. Files are delivered through the browser's normal download mechanism.
 
-The repo is public: `github.com/guillermorodriguez-dot/twh-troop-tools`. It is **not affiliated with or endorsed by the Boy Scouts of America** - avoid language, branding, or identifiers (app publisher, bundle ID, etc.) that imply otherwise. "BSA" only belongs in places describing actual BSA terminology (rank names, the "BSA ID" field, etc.), never as this project's own branding.
+The repo is public: `github.com/ErrorF002/twh-troop-tools`. It is **not affiliated with or endorsed by the Boy Scouts of America** - avoid language, branding, or identifiers (app publisher, bundle ID, etc.) that imply otherwise. "BSA" only belongs in places describing actual BSA terminology (rank names, the "BSA ID" field, etc.), never as this project's own branding.
 
 ---
 
