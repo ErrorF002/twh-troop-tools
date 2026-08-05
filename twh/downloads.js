@@ -23,6 +23,10 @@ const TROOPWEBHOST_REPORT_BASE = "https://www.troopwebhost.org/FormReport.aspx";
 // badge history) can take TroopWebHost noticeably longer to generate than a
 // simple roster export - give it generous headroom before giving up.
 const DOWNLOAD_TIMEOUT_MS = 120000;
+// How long to give the download a head start before checking whether we've
+// been silently redirected away from the report URL (see
+// raceDownloadAgainstPermissionRedirect below).
+const PERMISSION_CHECK_DELAY_MS = 15000;
 
 // ═══════════════════════════════ RECIPES ════════════════════════════════
 // Each recipe maps to a direct TroopWebHost report URL. The Menu_Item_ID
@@ -72,39 +76,20 @@ async function downloadReport(page, reportName) {
   const url = reportUrl(menuItemId);
   console.log(`  → Navigating to report URL: ${url}`);
 
-  // Set up the download listener first, then navigate.
+  // Set up the download listener first, then navigate. page.goto() usually
+  // rejects when the response is a file download (the browser interrupts
+  // navigation to start the download) - this is expected and ignored. That
+  // resolve-vs-reject outcome isn't a reliable enough signal on its own to
+  // detect a missing-permission redirect though: there's a race between
+  // Chromium's download interception and Playwright's "commit" milestone,
+  // and goto() can resolve even for a real, successful download. Don't act
+  // on it directly - see raceDownloadAgainstPermissionRedirect below.
   const downloadPromise = page.waitForEvent("download", { timeout: DOWNLOAD_TIMEOUT_MS });
-
-  // page.goto() rejects when the response is a file download - the browser
-  // interrupts navigation to start the download instead of loading a page.
-  // This is expected and we ignore it. But if goto() *resolves* instead,
-  // TroopWebHost served a normal page, not a file - almost always because
-  // the signed-in account doesn't have permission to run this report, so
-  // TWH silently redirects back to Home rather than showing an error. Catch
-  // that immediately instead of waiting out the full download timeout for
-  // an event that was never going to fire.
-  let loadedNormalPage = false;
-  try {
-    await page.goto(url, { waitUntil: "commit", timeout: DOWNLOAD_TIMEOUT_MS });
-    loadedNormalPage = true;
-  } catch {
-    // expected when the response is a file
-  }
-
-  if (loadedNormalPage) {
-    const diagPath = await captureDiagnostics(page, `no-permission-${recipe.id}`);
-    throw new Error(
-      `TroopWebHost loaded a normal page instead of returning "${recipe.description}". ` +
-      "This almost always means the signed-in account doesn't have permission to run this " +
-      "report - ask your Key 3 or Committee Chair to grant Scoutmaster-level access or " +
-      "Report permissions. (If this happens after being idle a long time, try reconnecting " +
-      "via the Connect button instead.) " +
-      `Diagnostic info: ${diagPath}`
-    );
-  }
+  page.goto(url, { waitUntil: "commit", timeout: DOWNLOAD_TIMEOUT_MS })
+    .catch(() => { /* expected: throws when response is a file download */ });
 
   try {
-    const download = await downloadPromise;
+    const download = await raceDownloadAgainstPermissionRedirect(page, downloadPromise, recipe);
 
     const tempDir = path.join(os.tmpdir(), "troop-tools-twh");
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
@@ -117,6 +102,8 @@ async function downloadReport(page, reportName) {
     console.log(`  → Saved: ${savePath}`);
     return savePath;
   } catch (err) {
+    if (err.isPermissionError) throw err;
+
     // Capture diagnostics on failure
     const diagPath = await captureDiagnostics(page, `download-failed-${recipe.id}`);
     const isTimeout = /timeout/i.test(err.message) && /exceeded/i.test(err.message);
@@ -127,6 +114,37 @@ async function downloadReport(page, reportName) {
       : `Failed to download ${recipe.description}: ${err.message}`;
     throw new Error(`${summary}  Diagnostic info: ${diagPath}`);
   }
+}
+
+/**
+ * Give the download a head start; if it hasn't fired yet, check whether
+ * page.url() shows we've been silently redirected away from the report URL
+ * (the signature of an account lacking permission for this report) so we
+ * can fail fast with a clear message instead of waiting out the full
+ * download timeout. If we're still parked on the report URL, this is more
+ * likely just a slow report - keep waiting on the original download promise.
+ */
+async function raceDownloadAgainstPermissionRedirect(page, downloadPromise, recipe) {
+  const headStart = new Promise(resolve => setTimeout(() => resolve(undefined), PERMISSION_CHECK_DELAY_MS));
+  const early = await Promise.race([downloadPromise, headStart]);
+  if (early) return early;
+
+  if (!page.url().includes("FormReport.aspx")) {
+    downloadPromise.catch(() => {}); // it'll time out on its own; avoid an unhandled rejection
+    const diagPath = await captureDiagnostics(page, `no-permission-${recipe.id}`);
+    const err = new Error(
+      `TroopWebHost loaded a normal page instead of returning "${recipe.description}". ` +
+      "This almost always means the signed-in account doesn't have permission to run this " +
+      "report - ask your Key 3 or Committee Chair to grant Scoutmaster-level access or " +
+      "Report permissions. (If this happens after being idle a long time, try reconnecting " +
+      "via the Connect button instead.) " +
+      `Diagnostic info: ${diagPath}`
+    );
+    err.isPermissionError = true;
+    throw err;
+  }
+
+  return downloadPromise;
 }
 
 /**
