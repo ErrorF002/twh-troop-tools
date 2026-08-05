@@ -275,30 +275,21 @@ async function waitForLoggedIn(page, timeoutMs) {
 }
 
 async function detectLoggedIn(page) {
+  // Require a genuine "Log Off" marker - this is the one signal that's
+  // specific to actually being authenticated. Generic nav-text matches
+  // (e.g. "Membership", "Calendar") and "no password field left" were both
+  // too easy to false-positive on a failed login (wrong password), which
+  // left the app reporting a successful connection while every subsequent
+  // request silently hit TroopWebHost unauthenticated.
   for (const frame of page.frames()) {
     try {
       const hasLogout = await frame.locator(
-        'a:has-text("Log Off"), a:has-text("Logout"), a:has-text("Sign Out")'
+        'a[href*="logoff" i], a:has-text("Log Off"), a:has-text("Logout"), a:has-text("Sign Out")'
       ).count() > 0;
       if (hasLogout) return true;
-      const hasMenu = await frame.locator(
-        'a:has-text("Membership"), a:has-text("Calendar"), a:has-text("Advancement")'
-      ).count() > 0;
-      if (hasMenu) return true;
     } catch {}
   }
-  // If neither marker found and no password field remains, we probably
-  // navigated past the login form
-  let stillHasPassword = false;
-  for (const frame of page.frames()) {
-    try {
-      if (await frame.locator('input[type="password"]').count() > 0) {
-        stillHasPassword = true;
-        break;
-      }
-    } catch {}
-  }
-  return !stillHasPassword;
+  return false;
 }
 
 async function extractLoginError(page) {
