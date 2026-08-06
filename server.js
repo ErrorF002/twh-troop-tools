@@ -40,7 +40,15 @@ const twhSession = require("./twh/session");
 const { login: twhLogin } = require("./twh/login");
 const { downloadReport: twhDownload } = require("./twh/downloads");
 const settings   = require("./settings");
+const cache      = require("./cache");
 const { version: APP_VERSION } = require("./package.json");
+
+// A manifest input's cache slot: the TWH report id for TWH-backed inputs,
+// or an explicit cacheKey for other cacheable sources (e.g. my.scouting).
+// Inputs with neither aren't cached.
+function resolveCacheKey(inputSpec) {
+  return inputSpec.twhReport || inputSpec.cacheKey || null;
+}
 
 const PORT = 3000; // starting port — auto-increments if in use
 const app = express();
@@ -150,6 +158,11 @@ app.get("/api/version", (req, res) => {
   res.json({ version: APP_VERSION });
 });
 
+// ═══════════════════════════════ CACHE ══════════════════════════════════
+app.get("/api/cache/status", (req, res) => {
+  res.json({ staleDays: cache.STALE_DAYS, sources: cache.allStatus() });
+});
+
 // ═══════════════════════════════ SETTINGS ══════════════════════════════
 app.get("/api/settings", (req, res) => {
   res.json(settings.load());
@@ -179,6 +192,7 @@ app.get("/api/reports", (req, res) => {
         hint: i.hint,
         required: i.required,
         autoFetch: !!i.twhReport,
+        cacheKey: resolveCacheKey(i),
       })),
       options: (m.options || []).map(o => ({
         key: o.key,
@@ -192,6 +206,7 @@ app.get("/api/reports", (req, res) => {
       canAutoFetch: m.inputs.filter(i => i.required).every(i => !!i.twhReport),
       canPartialFetch: m.inputs.some(i => i.required && !!i.twhReport) &&
                        m.inputs.some(i => i.required && !i.twhReport),
+      canGenerateFromCache: m.inputs.filter(i => i.required).every(i => !!resolveCacheKey(i)),
     };
   });
   res.json(list);
@@ -241,10 +256,6 @@ app.post("/api/reports/:id/fetch-and-generate", (req, res) => {
   const report = reports[req.params.id];
   if (!report) return res.status(404).json({ error: "Unknown report" });
 
-  if (!twhSession.isActive()) {
-    return res.status(401).json({ error: "Not logged in to TroopWebHost", needsLogin: true });
-  }
-
   // Accept any manual-upload fields alongside the fetch
   const manualFields = report.manifest.inputs
     .filter(i => !i.twhReport)
@@ -253,13 +264,18 @@ app.post("/api/reports/:id/fetch-and-generate", (req, res) => {
   upload.fields(manualFields)(req, res, async (err) => {
     if (err) return res.status(400).json({ error: err.message });
 
-    // Options come in the body (may be JSON string if multipart)
+    // Options come in the body (may be a JSON string if multipart)
     let options = {};
     try {
       options = req.body.options
         ? (typeof req.body.options === "string" ? JSON.parse(req.body.options) : req.body.options)
         : {};
     } catch {}
+    // "Generate from Cache" button: read every cacheable input straight from
+    // the local cache, no TroopWebHost traffic at all. "Fetch and Generate"
+    // (useCache falsy) always does a live fetch, same as before caching
+    // existed, and refreshes the cache with the result.
+    const useCache = req.body.useCache === true || req.body.useCache === "true";
 
     // Validate required options
     if (report.manifest.options) {
@@ -270,6 +286,19 @@ app.post("/api/reports/:id/fetch-and-generate", (req, res) => {
       }
     }
 
+    if (useCache) {
+      const uncached = report.manifest.inputs.filter(i =>
+        i.required && (!resolveCacheKey(i) || !cache.isFresh(resolveCacheKey(i)))
+      );
+      if (uncached.length) {
+        return res.status(400).json({
+          error: `No fresh cached copy available for: ${uncached.map(i => i.label).join(", ")}`,
+        });
+      }
+    } else if (!twhSession.isActive()) {
+      return res.status(401).json({ error: "Not logged in to TroopWebHost", needsLogin: true });
+    }
+
     const fetchedFiles = [];
     const tempFilesToCleanup = [];
 
@@ -277,6 +306,15 @@ app.post("/api/reports/:id/fetch-and-generate", (req, res) => {
       const inputs = {};
 
       for (const inputSpec of report.manifest.inputs) {
+        const cacheKey = resolveCacheKey(inputSpec);
+
+        if (useCache && cacheKey) {
+          const st = cache.status(cacheKey);
+          console.log(`▶ Using cached ${cacheKey} (${st.ageDays}d old)`);
+          inputs[inputSpec.key] = cache.csvFilePath(cacheKey);
+          continue;
+        }
+
         if (inputSpec.twhReport) {
           // Fetch this one from TroopWebHost
           console.log(`▶ Fetching ${inputSpec.twhReport} from TroopWebHost...`);
@@ -284,6 +322,7 @@ app.post("/api/reports/:id/fetch-and-generate", (req, res) => {
           inputs[inputSpec.key] = csvPath;
           fetchedFiles.push(csvPath);
           twhSession.touch();
+          try { cache.store(inputSpec.twhReport, csvPath); } catch (e) { console.warn("Cache write failed:", e.message); }
         } else {
           // Expect this one as an uploaded file
           const fileArr = req.files && req.files[inputSpec.key];
@@ -293,6 +332,9 @@ app.post("/api/reports/:id/fetch-and-generate", (req, res) => {
           if (fileArr && fileArr.length > 0) {
             inputs[inputSpec.key] = fileArr[0].path;
             tempFilesToCleanup.push(fileArr[0].path);
+            if (cacheKey) {
+              try { cache.store(cacheKey, fileArr[0].path); } catch (e) { console.warn("Cache write failed:", e.message); }
+            }
           }
         }
       }
@@ -348,6 +390,10 @@ app.post("/api/reports/:id/generate", (req, res) => {
         if (fileArr && fileArr.length > 0) {
           inputs[input.key] = fileArr[0].path;
           tempFilesToCleanup.push(fileArr[0].path);
+          const cacheKey = resolveCacheKey(input);
+          if (cacheKey) {
+            try { cache.store(cacheKey, fileArr[0].path); } catch (e) { console.warn("Cache write failed:", e.message); }
+          }
         }
       }
 

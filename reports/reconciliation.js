@@ -49,6 +49,7 @@ const manifest = {
       hint: "my.scouting.org → Roster Report export",
       required: true,
       twhReport: null,
+      cacheKey: "myscouting-roster", // no TWH auto-download exists for this source - manual upload is its only refresh path
     },
   ],
   options: [
