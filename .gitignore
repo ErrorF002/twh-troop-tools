@@ -9,3 +9,4 @@ dist/
 .claude/
 settings.json
 cache/
+reportids.txt
