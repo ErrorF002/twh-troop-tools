@@ -287,7 +287,7 @@
   // ─── Dashboard sections ───────────────────────────────
   const SECTIONS = [
     { label: "Review", ids: ["reconciliation", "roster-audit"] },
-    { label: "Plan",   ids: ["advancement", "merit-badges", "patrol-balance"] },
+    { label: "Plan",   ids: ["advancement", "merit-badges", "merit-badge-search", "patrol-balance"] },
     { label: "Data",   ids: ["contacts", "health"] },
   ];
 
@@ -300,6 +300,36 @@
 
   const container = $("#reports-container");
 
+  let cacheStatus = { staleDays: 7, sources: {} };
+
+  async function refreshCacheStatus() {
+    try {
+      const cacheRes = await fetch("/api/cache/status");
+      cacheStatus = await cacheRes.json();
+    } catch {
+      cacheStatus = { staleDays: 7, sources: {} };
+    }
+  }
+
+  function formatCacheAge(ageDays) {
+    if (ageDays <= 0) return "today";
+    if (ageDays === 1) return "1 day old";
+    return `${ageDays} days old`;
+  }
+
+  function isStale(ageDays) {
+    return ageDays > (cacheStatus.staleDays || 7);
+  }
+
+  function cacheNoteHTML(input) {
+    if (!input.cacheKey) return "";
+    const st = cacheStatus.sources[input.cacheKey];
+    if (!st) return ` <span class="cache-note cache-note-empty">(no cached copy yet)</span>`;
+    const staleClass = isStale(st.ageDays) ? " stale" : "";
+    const staleWarning = isStale(st.ageDays) ? " — consider refreshing" : "";
+    return ` <span class="cache-note${staleClass}">(cached copy: ${formatCacheAge(st.ageDays)}${staleWarning})</span>`;
+  }
+
   async function renderDashboard() {
     let reports;
     try {
@@ -309,6 +339,7 @@
       container.innerHTML = `<div class="result error">Could not load reports.</div>`;
       return;
     }
+    await refreshCacheStatus();
     if (!reports || reports.length === 0) {
       container.innerHTML = `<div class="loading">No reports available.</div>`;
       return;
@@ -340,6 +371,27 @@
     const canPartial = manifest.canPartialFetch && twhConnected;
     const hasOptions = manifest.options && manifest.options.length > 0;
 
+    // "Generate from Cache" doesn't need a TWH connection at all - it's
+    // available whenever every required input has a cache slot, regardless
+    // of connection state. It's only *clickable* when those slots are
+    // actually filled with fresh (non-stale) data.
+    const cacheableInputs = manifest.inputs.filter(i => i.cacheKey);
+    const cacheReady = manifest.canGenerateFromCache && manifest.inputs
+      .filter(i => i.required)
+      .every(i => {
+        const st = i.cacheKey && cacheStatus.sources[i.cacheKey];
+        return st && !isStale(st.ageDays);
+      });
+
+    function buildCacheSummaryHTML() {
+      if (!cacheableInputs.length) return "";
+      return `<div class="cache-status">${cacheableInputs.map(i => {
+        const st = cacheStatus.sources[i.cacheKey];
+        const stale = st && isStale(st.ageDays);
+        return `<span class="cache-status-item${stale ? " stale" : ""}">${escape(i.label)}: ${st ? formatCacheAge(st.ageDays) : "not cached yet"}</span>`;
+      }).join("")}</div>`;
+    }
+
     card.innerHTML = `
       <div class="card-header">
         <span class="card-icon">${escape(manifest.icon || "📄")}</span>
@@ -348,10 +400,16 @@
       </div>
       <div class="card-body">
         <p class="card-description">${escape(manifest.description)}</p>
+        <div class="cache-status-container">${buildCacheSummaryHTML()}</div>
         ${hasOptions ? `<div class="option-inputs"></div>` : ""}
+        ${manifest.canGenerateFromCache ? `
+          <button class="cache-btn" ${cacheReady ? "" : "disabled"} title="${cacheReady ? "" : "Needs a fresh (within 7 days) cached copy of every required file"}">
+            <span class="icon">📦</span> Generate from Cache
+          </button>
+        ` : ""}
         ${canAuto ? `
           <button class="fetch-btn">
-            <span class="icon">⬇</span> Fetch &amp; Generate
+            <span class="icon">📥</span> Fetch &amp; Generate
           </button>
           <button class="manual-toggle" type="button">or upload CSVs manually ▾</button>
         ` : ""}
@@ -359,7 +417,7 @@
           <div class="partial-fetch-section">
             <div class="partial-fetch-inputs"></div>
             <button class="fetch-btn fetch-btn-partial" disabled>
-              <span class="icon">⬇</span> Fetch from TroopWebHost &amp; Generate
+              <span class="icon">📥</span> Fetch from TroopWebHost &amp; Generate
             </button>
           </div>
           <button class="manual-toggle" type="button">or upload all CSVs manually ▾</button>
@@ -378,6 +436,7 @@
     const resultArea               = card.querySelector(".result-area");
     const fetchBtn                 = card.querySelector(".fetch-btn:not(.fetch-btn-partial)");
     const fetchBtnPartial          = card.querySelector(".fetch-btn-partial");
+    const cacheBtn                 = card.querySelector(".cache-btn");
     const manualToggle             = card.querySelector(".manual-toggle");
     const manualSection            = card.querySelector(".manual-section");
     const optionInputsContainer    = card.querySelector(".option-inputs");
@@ -426,6 +485,21 @@
               updateButtonStates();
             });
           });
+        } else if (opt.type === "select") {
+          const choicesHTML = (opt.choices || []).map(c => `
+            <option value="${escape(c.value)}" ${opt.default === c.value ? "selected" : ""}>${escape(c.label)}</option>`
+          ).join("");
+          wrapper.innerHTML = `
+            <label class="field">
+              <span class="field-label">${escape(opt.label)}${opt.required ? " *" : ""}</span>
+              <select class="option-select" data-key="${escape(opt.key)}">${choicesHTML}</select>
+            </label>`;
+          const select = wrapper.querySelector("select");
+          if (opt.default !== undefined) select.value = opt.default;
+          select.addEventListener("change", () => {
+            optionValues[opt.key] = select.value;
+            updateButtonStates();
+          });
         } else if (opt.type === "checkbox") {
           if (opt.default !== undefined) optionValues[opt.key] = opt.default;
           wrapper.innerHTML = `
@@ -472,7 +546,7 @@
         fi.className = "file-input";
         fi.innerHTML = `
           <label class="file-label">${escape(input.label)}${input.required ? " *" : ""}</label>
-          <span class="file-hint">${escape(input.hint || "")}</span>
+          <span class="file-hint">${escape(input.hint || "")}${cacheNoteHTML(input)}</span>
           <label class="file-drop" data-key="${escape(input.key)}">
             <span class="file-drop-icon">📁</span>
             <span class="file-drop-text">Drop CSV here or click to browse</span>
@@ -525,7 +599,7 @@
       fi.className = "file-input";
       fi.innerHTML = `
         <label class="file-label">${escape(input.label)}${input.required ? " *" : ""}</label>
-        <span class="file-hint">${escape(input.hint || "")}</span>
+        <span class="file-hint">${escape(input.hint || "")}${cacheNoteHTML(input)}</span>
         <label class="file-drop" data-key="${escape(input.key)}">
           <span class="file-drop-icon">📁</span>
           <span class="file-drop-text">Drop CSV here or click to browse</span>
@@ -570,7 +644,27 @@
       }
     });
 
-    // ─── Fetch & Generate (auto-fetch) ───
+    // ─── Generate from Cache (no TroopWebHost traffic at all) ───
+    if (cacheBtn) {
+      cacheBtn.addEventListener("click", async () => {
+        cacheBtn.disabled = true;
+        showResult(resultArea, "working", `<span class="spinner"></span>Generating from cached data…`);
+        try {
+          const res = await fetch(`/api/reports/${manifest.id}/fetch-and-generate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ options: optionValues, useCache: true }),
+          });
+          await handleResponse(res, resultArea);
+        } catch (err) {
+          showResult(resultArea, "error", `Error: ${escape(err.message)}`);
+        } finally {
+          cacheBtn.disabled = !cacheReady;
+        }
+      });
+    }
+
+    // ─── Fetch & Generate (always live-fetches from TroopWebHost) ───
     if (fetchBtn) {
       fetchBtn.addEventListener("click", async () => {
         fetchBtn.disabled = true;

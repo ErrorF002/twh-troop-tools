@@ -190,6 +190,23 @@ main {
   cursor: default;
 }
 
+.field select {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: #FFFFFF;
+  color: var(--text-dark);
+  font-family: inherit;
+}
+
+.field select:focus {
+  outline: none;
+  border-color: var(--od-green);
+  box-shadow: 0 0 0 3px rgba(58, 79, 42, 0.15);
+}
+
 .change-link {
   display: inline-block;
   margin-top: 0.35rem;
@@ -374,6 +391,72 @@ main {
   font-size: 0.92rem;
   margin-bottom: 1.25rem;
   line-height: 1.5;
+}
+
+/* ─── Cache status ──────────────────────────────────────── */
+.cache-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: -0.5rem 0 1rem;
+}
+
+.cache-status-item {
+  background: var(--tan-light);
+  color: var(--tan-dark);
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+.cache-status-item.stale {
+  background: #FBE3CC;
+  color: #B45309;
+  font-weight: 600;
+}
+
+.cache-note {
+  font-size: 0.85em;
+  color: var(--tan-dark);
+}
+
+.cache-note.stale {
+  color: #B45309;
+  font-weight: 600;
+}
+
+/* ─── Generate from Cache Button (secondary action) ──────── */
+.cache-btn {
+  width: 100%;
+  background: var(--tan);
+  color: var(--od-green-dark);
+  border: none;
+  padding: 0.85rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  margin-bottom: 0.5rem;
+}
+
+.cache-btn:hover:not(:disabled) {
+  background: var(--tan-dark);
+  color: var(--text-light);
+}
+
+.cache-btn:active:not(:disabled) { transform: translateY(1px); }
+.cache-btn:disabled { background: var(--tan-light); color: var(--tan-dark); cursor: not-allowed; opacity: 0.7; }
+
+.cache-btn .icon {
+  display: inline-block;
+  margin-right: 0.4rem;
+}
+
+.cache-note-empty {
+  color: var(--text-mid);
+  font-style: italic;
 }
 
 /* ─── Option Inputs (text, radio) ──────────────────────── */
