@@ -65,6 +65,7 @@ const CONFIG = {
   medianFallbackThreshold: 5,
   patrolSlideItemCount: 10,
   troopWideItemCount: 20,
+  medianBandPadding: 5,
 };
 
 // ═══════════════════════════════ SUMMARIES ═════════════════════════════
@@ -142,9 +143,10 @@ const SUMMARIES = {
 };
 
 // ═══════════════════════════════ DATA LOADING ═══════════════════════════
-function buildPatrolMap(rosterPath) {
+function buildRosterMaps(rosterPath) {
   const rows = parseCSV(fs.readFileSync(rosterPath, "utf8"));
   const patrolMap = {};
+  const rankMap = {};
   rows.forEach(row => {
     if (row.Adult !== "N") return;
     const rawName = (row.Name || "").trim();
@@ -156,8 +158,9 @@ function buildPatrolMap(rosterPath) {
     if (!patrol) return;
     if (patrol.toLowerCase().startsWith("zinactive")) return;
     patrolMap[name] = patrol;
+    rankMap[name] = (row.Rank || "").trim();
   });
-  return patrolMap;
+  return { patrolMap, rankMap };
 }
 
 function readRequirements(reqPath, activeScouts) {
@@ -203,6 +206,36 @@ function rankAccent(rank) {
   if (rank.startsWith("Second")) return "1565C0";
   if (rank.startsWith("First")) return "6A1B9A";
   return "555555";
+}
+
+// ═══════════════════════════════ ROSTER RANK BADGES ═══════════════════
+// Maps a scout's roster Rank (from the Active Roster CSV) to the short
+// abbreviation shown next to their name in the patrol roster sidebar.
+function rankAbbrev(rank) {
+  const r = (rank || "").trim();
+  if (!r) return "";
+  if (r.startsWith("Scout")) return "S";
+  if (r.startsWith("Tenderfoot")) return "TF";
+  if (r.startsWith("Second Class")) return "2C";
+  if (r.startsWith("First Class")) return "1C";
+  if (r.startsWith("Star")) return "St";
+  if (r.startsWith("Life")) return "L";
+  if (r.startsWith("Eagle")) return "E";
+  if (/palm/i.test(r)) return "E";
+  return "";
+}
+
+function rankBadgeColor(abbrev) {
+  switch (abbrev) {
+    case "S": return "2E7D32";
+    case "TF": return "E65100";
+    case "2C": return "1565C0";
+    case "1C": return "6A1B9A";
+    case "St": return "C7A975";
+    case "L": return "9E2A2B";
+    case "E": return "B8860B";
+    default: return "555555";
+  }
 }
 
 // ═══════════════════════════════ RANKING LOGIC ════════════════════════
@@ -254,6 +287,14 @@ function topForPatrol(allReqs, scouts, maxItems) {
 }
 
 // ═══════════════════════════════ TEXT HELPERS ═════════════════════════
+function formatScoutName(rawName) {
+  const parts = rawName.split(",");
+  if (parts.length < 2) return rawName;
+  const last = parts[0].trim();
+  const first = parts[1].trim().split(/\s+/)[0];
+  return `${first} ${last}`;
+}
+
 function shortenDesc(desc, maxLen = 85) {
   if (desc.length <= maxLen) return desc;
   const cut = desc.slice(0, maxLen - 1);
@@ -406,7 +447,7 @@ function addSummarySlide(pres, items, pageLabel) {
   });
 }
 
-function addPatrolSlide(pres, patrolName, patrolScouts, items, excludedNames) {
+function addPatrolSlide(pres, patrolName, patrolScouts, items, excludedNames, rankMap) {
   const slide = pres.addSlide();
   slide.background = { color: BG_LIGHT };
 
@@ -519,29 +560,34 @@ function addPatrolSlide(pres, patrolName, patrolScouts, items, excludedNames) {
     fontFace: "Calibri", align: "center", valign: "middle", margin: 0, charSpacing: 1,
   });
 
-  const fullNames = patrolScouts
+  const rosterEntries = patrolScouts
     .slice()
     .sort((a, b) => a.localeCompare(b))
-    .map(n => {
-      const parts = n.split(",");
-      if (parts.length < 2) return n;
-      const last = parts[0].trim();
-      const first = parts[1].trim().split(/\s+/)[0];
-      return `${first} ${last}`;
-    });
+    .map(n => ({
+      displayName: formatScoutName(n),
+      abbrev: rankAbbrev(rankMap && rankMap[n]),
+    }));
 
-  const nameRowH = Math.min(0.32, (items.length * rowH) / Math.max(fullNames.length, 1));
-  fullNames.forEach((name, idx) => {
+  const nameRowH = Math.min(0.32, (items.length * rowH) / Math.max(rosterEntries.length, 1));
+  const badgeW = 0.42;
+  rosterEntries.forEach(({ displayName, abbrev }, idx) => {
     const ny = rosterY + rosterHeaderH + idx * nameRowH;
     slide.addShape(pres.shapes.RECTANGLE, {
       x: rosterX, y: ny, w: rosterW, h: nameRowH - 0.02,
       fill: { color: idx % 2 === 0 ? "FFFFFF" : ROW_ALT }, line: { type: "none" },
     });
-    slide.addText(name, {
-      x: rosterX + 0.1, y: ny, w: rosterW - 0.2, h: nameRowH - 0.02,
+    slide.addText(displayName, {
+      x: rosterX + 0.1, y: ny, w: rosterW - 0.2 - badgeW, h: nameRowH - 0.02,
       fontSize: 10, color: TEXT_DARK,
       fontFace: "Calibri", align: "left", valign: "middle", margin: 0,
     });
+    if (abbrev) {
+      slide.addText(abbrev, {
+        x: rosterX + rosterW - badgeW - 0.08, y: ny, w: badgeW, h: nameRowH - 0.02,
+        fontSize: 9, bold: true, color: rankBadgeColor(abbrev),
+        fontFace: "Calibri", align: "right", valign: "middle", margin: 0,
+      });
+    }
   });
 
   // Legend
@@ -574,6 +620,208 @@ function addPatrolSlide(pres, patrolName, patrolScouts, items, excludedNames) {
   }
 }
 
+// ═══════════════════════════════ INDIVIDUAL PROGRESS ══════════════════
+// Counts, per rank, how many of that rank's uncompleted requirements a
+// given scout still has outstanding.
+function scoutRankCounts(allReqs, scoutName) {
+  const counts = {};
+  CONFIG.includedRanks.forEach(r => { counts[r] = 0; });
+  allReqs.forEach(item => {
+    if (item.scouts.includes(scoutName)) {
+      counts[item.rank] += 1;
+    }
+  });
+  return counts;
+}
+
+// Total number of distinct (trackable, non-excluded) requirement items in
+// each rank, derived from the troop-wide data itself rather than a
+// hardcoded BSA checklist - keeps it in sync with whatever the CSV and
+// exclusion filters actually produced.
+function rankTotals(allReqs) {
+  const totals = {};
+  CONFIG.includedRanks.forEach(r => { totals[r] = 0; });
+  allReqs.forEach(item => { totals[item.rank] += 1; });
+  return totals;
+}
+
+// Total distinct completed count across all 4 tracked ranks for one scout.
+function scoutCompletedTotal(totals, outstanding) {
+  return CONFIG.includedRanks.reduce((sum, rank) => sum + (totals[rank] - outstanding[rank]), 0);
+}
+
+// Windows the grid down to the span of columns actually called out on the
+// patrol's summary slide, plus a few neighbors on either side for context.
+// Anchored to the lowest and highest index (in troop-wide rank/code order)
+// among the selected requirements, padded by `padding` columns each way -
+// this guarantees every selected requirement is always inside the shown
+// range (and therefore always highlighted), while still trimming the grid
+// down from the full troop-wide column count.
+function medianBandColumns(columns, highlightItems, padding) {
+  if (highlightItems.length === 0) return [];
+  const highlightKeys = new Set(highlightItems.map(it => `${it.rank}||${it.code}`));
+  const indices = [];
+  columns.forEach((item, idx) => {
+    if (highlightKeys.has(`${item.rank}||${item.code}`)) indices.push(idx);
+  });
+  if (indices.length === 0) return [];
+  const startIdx = Math.max(0, Math.min(...indices) - padding);
+  const endIdx = Math.min(columns.length - 1, Math.max(...indices) + padding);
+  return columns.slice(startIdx, endIdx + 1);
+}
+
+function addPatrolProgressSlide(pres, patrolName, patrolScouts, columns, rankMap, opts = {}) {
+  const { titleSuffix = "INDIVIDUAL PROGRESS", showCodes = false, highlightItems = [] } = opts;
+  const highlightKeys = new Set(highlightItems.map(it => `${it.rank}||${it.code}`));
+  const slide = pres.addSlide();
+  slide.background = { color: BG_LIGHT };
+
+  slide.addShape(pres.shapes.RECTANGLE, {
+    x: 0, y: 0, w: 10, h: 1.05,
+    fill: { color: BG_DARK }, line: { type: "none" },
+  });
+  slide.addShape(pres.shapes.RECTANGLE, {
+    x: 0, y: 1.0, w: 10, h: 0.06,
+    fill: { color: ACCENT }, line: { type: "none" },
+  });
+
+  slide.addText(`${patrolName.toUpperCase()} PATROL — ${titleSuffix}`, {
+    x: 0.3, y: 0.1, w: 9.4, h: 0.85,
+    fontSize: 22, bold: true, color: TEXT_LIGHT,
+    fontFace: "Arial Black", align: "center", valign: "middle", margin: 0, charSpacing: 1,
+  });
+
+  const totals = rankTotals(columns);
+
+  // Least-completed scouts first, so drawing rows top-to-bottom puts the
+  // most-advanced scout at the bottom. Totals reflect only the columns
+  // actually shown on this grid, so they stay consistent with the dots.
+  const rows = patrolScouts
+    .map(n => {
+      const outstanding = scoutRankCounts(columns, n);
+      return { name: n, total: scoutCompletedTotal(totals, outstanding) };
+    })
+    .sort((a, b) => (a.total - b.total) || a.name.localeCompare(b.name));
+
+  const gridX = 2.1, bandH = 0.22;
+  const gridW = 6.85, totalColW = 0.45;
+  const codeBandH = showCodes ? 0.32 : 0;
+  const gridY = 1.5 + codeBandH;
+  const rowsAreaH = 3.9 - codeBandH;
+  const rowH = Math.min(0.7, rowsAreaH / Math.max(rows.length, 1));
+  const colW = gridW / Math.max(columns.length, 1);
+  const dotR = Math.min(colW, rowH) * 0.3;
+
+  // Rotated requirement-code label per column, only when there's enough
+  // room per column (median-band slide, fewer columns than the full grid).
+  if (showCodes) {
+    columns.forEach((item, ci) => {
+      const cx = gridX + ci * colW + colW / 2;
+      const cy = 1.5 + codeBandH / 2;
+      slide.addText(item.code.replace(/\s+/g, ""), {
+        x: cx - codeBandH / 2, y: cy - colW / 2, w: codeBandH, h: colW,
+        fontSize: 6, color: TEXT_DARK,
+        fontFace: "Calibri", align: "center", valign: "middle", margin: 0,
+        rotate: 270,
+      });
+    });
+  }
+
+  // Rank header bands above the dot grid line up with each column's rank.
+  let bx = gridX;
+  CONFIG.includedRanks.forEach(rank => {
+    const count = columns.filter(c => c.rank === rank).length;
+    if (count === 0) return;
+    const w = colW * count;
+    slide.addShape(pres.shapes.RECTANGLE, {
+      x: bx, y: gridY, w, h: bandH,
+      fill: { color: rankAccent(rank) }, line: { type: "none" },
+    });
+    if (w > 0.55) {
+      slide.addText(rankLabel(rank), {
+        x: bx, y: gridY, w, h: bandH,
+        fontSize: 8, bold: true, color: TEXT_LIGHT,
+        fontFace: "Calibri", align: "center", valign: "middle", margin: 0,
+      });
+    }
+    bx += w;
+  });
+  slide.addShape(pres.shapes.RECTANGLE, {
+    x: gridX + gridW + 0.05, y: gridY, w: totalColW, h: bandH,
+    fill: { color: BG_DARK }, line: { type: "none" },
+  });
+  slide.addText("TOTAL", {
+    x: gridX + gridW + 0.05, y: gridY, w: totalColW, h: bandH,
+    fontSize: 7, bold: true, color: TEXT_LIGHT,
+    fontFace: "Calibri", align: "center", valign: "middle", margin: 0,
+  });
+
+  const rowsBottom = gridY + bandH + rows.length * rowH;
+
+  // Pass 1: row background stripes (full width).
+  rows.forEach((_, ri) => {
+    const ry = gridY + bandH + ri * rowH;
+    slide.addShape(pres.shapes.RECTANGLE, {
+      x: 0.3, y: ry, w: gridX + gridW + totalColW - 0.3, h: rowH - 0.01,
+      fill: { color: ri % 2 === 0 ? "FFFFFF" : ROW_ALT }, line: { type: "none" },
+    });
+  });
+
+  // Pass 2: highlight tint behind columns for requirements also called out
+  // on this patrol's summary slide, so it's obvious where those items fall
+  // in the individual-progress picture. Drawn over the row stripes but
+  // under the dots/text, and confined to the rows area (not the header
+  // bands) so it doesn't clash with the rank-color/code labels above.
+  if (highlightKeys.size > 0) {
+    columns.forEach((item, ci) => {
+      if (!highlightKeys.has(`${item.rank}||${item.code}`)) return;
+      slide.addShape(pres.shapes.RECTANGLE, {
+        x: gridX + ci * colW, y: gridY + bandH, w: colW, h: rowsBottom - (gridY + bandH),
+        fill: { color: ACCENT, transparency: 55 }, line: { type: "none" },
+      });
+    });
+  }
+
+  // Pass 3: scout names, completion dots, and totals on top.
+  rows.forEach(({ name, total }, ri) => {
+    const ry = gridY + bandH + ri * rowH;
+
+    const abbrev = rankAbbrev(rankMap && rankMap[name]);
+    const label = abbrev ? `${formatScoutName(name)} (${abbrev})` : formatScoutName(name);
+    slide.addText(label, {
+      x: 0.3, y: ry, w: gridX - 0.35, h: rowH - 0.01,
+      fontSize: 9.5, color: TEXT_DARK,
+      fontFace: "Calibri", align: "left", valign: "middle", margin: 0,
+    });
+
+    columns.forEach((item, ci) => {
+      if (item.scouts.includes(name)) return; // still outstanding - no dot
+      const cx = gridX + ci * colW + colW / 2;
+      const cy = ry + (rowH - 0.01) / 2;
+      slide.addShape(pres.shapes.OVAL, {
+        x: cx - dotR, y: cy - dotR, w: dotR * 2, h: dotR * 2,
+        fill: { color: rankAccent(item.rank) }, line: { type: "none" },
+      });
+    });
+
+    slide.addText(String(total), {
+      x: gridX + gridW + 0.05, y: ry, w: totalColW, h: rowH - 0.01,
+      fontSize: 10, bold: true, color: TEXT_DARK,
+      fontFace: "Calibri", align: "center", valign: "middle", margin: 0,
+    });
+  });
+
+  const highlightNote = highlightKeys.size > 0 ? "  •  highlighted = also on this patrol's focus list" : "";
+  slide.addText(
+    `● = requirement completed, colored by rank  •  ${columns.length} requirements shown${highlightNote}`,
+    {
+      x: 0.3, y: rowsBottom + 0.05, w: 9.4, h: 0.25,
+      fontSize: 8, color: TEXT_MID, italic: true,
+      fontFace: "Calibri", align: "center", margin: 0,
+    }
+  );
+}
+
 // ═══════════════════════════════ MAIN ENTRY POINT ══════════════════════
 /**
  * Generate the PPTX from uploaded files.
@@ -587,7 +835,7 @@ async function generate(inputs, outputDir, options = {}) {
   if (!reqPath || !fs.existsSync(reqPath)) throw new Error("Requirements CSV not provided");
   if (!rosterPath || !fs.existsSync(rosterPath)) throw new Error("Roster CSV not provided");
 
-  const patrolMap = buildPatrolMap(rosterPath);
+  const { patrolMap, rankMap } = buildRosterMaps(rosterPath);
   const activeScouts = new Set(Object.keys(patrolMap));
   const allReqs = readRequirements(reqPath, activeScouts);
 
@@ -618,6 +866,12 @@ async function generate(inputs, outputDir, options = {}) {
   addSummarySlide(pres, topN.slice(0, half), `#1–${half}`);
   addSummarySlide(pres, topN.slice(half, CONFIG.troopWideItemCount), `#${half + 1}–${CONFIG.troopWideItemCount}`);
 
+  // Every trackable requirement, troop-wide, ordered rank by rank - these
+  // become the progress grids' columns. (allReqs is already built rank
+  // block by rank block, code ascending within each block, since that's
+  // the order rows appear in the source CSV.)
+  const allColumns = CONFIG.includedRanks.flatMap(rank => allReqs.filter(r => r.rank === rank));
+
   let patrolsRendered = 0;
   patrols.forEach(p => {
     const allPatrolScouts = byPatrol[p];
@@ -628,7 +882,15 @@ async function generate(inputs, outputDir, options = {}) {
     const items = topForPatrol(allReqs, analyzed, CONFIG.patrolSlideItemCount);
     if (items.length === 0) return;
 
-    addPatrolSlide(pres, p, analyzed, items, excluded);
+    addPatrolSlide(pres, p, analyzed, items, excluded, rankMap);
+
+    const bandColumns = medianBandColumns(allColumns, items, CONFIG.medianBandPadding);
+    if (bandColumns.length > 0) {
+      addPatrolProgressSlide(pres, p, analyzed, bandColumns, rankMap, {
+        showCodes: true,
+        highlightItems: items,
+      });
+    }
     patrolsRendered++;
   });
 
